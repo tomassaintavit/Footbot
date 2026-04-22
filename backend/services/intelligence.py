@@ -14,15 +14,24 @@ def extract_intent(user_prompt: str, model: str = "llama3"):
     - chat: Charla normal, preguntas de información.
     - delete_debt: Si se pide perdonar, borrar o cancelar una deuda.
     - update_debt: Marcamos un pago como realizado o modificamos montos.
-    - manage_player: Si se pide agregar, eliminar o modificar un jugador.
     - upload_attendance: Si se pide subir la lista de asistencia.
     - add_debt: Si se pide agregar una deuda.
+    - add_player: Si se pide agregar un jugador.
+    - delete_player: Si se pide eliminar un jugador.
+    - update_player: Si se pide modificar un jugador o agregarle datos.
+    - get_player: Si se pide obtener información de un jugador.
     Texto del usuario: "{user_prompt}"
     Formato de respuesta (JSON):
     {{
         "action": "nombre_de_la_accion",
         "response": "Respuesta de texto amigable para el jugador",
-        "params": {{ "player_name": "nombre si aplica", "amount": 0 }}
+        "params": {{ 
+            "player_name": "nombre si aplica", 
+            "amount": 0, 
+            "nickname": "apodo si aplica", 
+            "dni": "DNI si aplica", 
+            "email": "email si aplica"
+        }}
     }}
     """
     

@@ -19,6 +19,13 @@ class Player(BaseModel):
     nickname: Optional[str] = None
     dni: Optional[str] = None
     email: Optional[str] = None
+    goals : Optional[int] = 0
+    yellow_cards : Optional[int] = 0
+    red_cards : Optional[int] = 0
+    is_suspended : Optional[bool] = False
+    suspension_reason : Optional[str] = None
+    is_admin : Optional[bool] = False
+    auth_id : Optional[str] = None
 
 class PlayerSync(BaseModel):
     name: str
