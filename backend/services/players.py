@@ -60,21 +60,32 @@ def update_player(name: str, **kwargs):
     
 def get_player(name: str):
     try:
-        # 1. Buscamos al jugador (usamos ilike para que sea flexible con mayúsculas)
+        # 1. Buscamos al jugador
         player_query = supabase.table("players").select("*").ilike("name", name).execute()
         
         if not player_query.data:
             return {"success": False, "message": f"🔍 No encontré a ningún jugador llamado '{name}'."}
         
         player = player_query.data[0]
+        player_id = player["id"]
+
+        # 2. Consultamos sus deudas y calculamos el total
+        debts_query = supabase.table("debts").select("amount").eq("player_id", player_id).execute()
+        total_debt = sum(d["amount"] for d in debts_query.data) if debts_query.data else 0
         
-        # 2. Construimos una ficha técnica amigable para mostrar en el chat
+        # 3. Construimos la ficha técnica mejorada
         info = f"👤 Ficha de {player['name']}:\n"
         info += f"🔹 Apodo: {player.get('nickname') or '---'}\n"
         info += f"🔹 DNI: {player.get('dni') or '---'}\n"
         info += f"🔹 Goles: {player.get('goals', 0)}\n"
         info += f"🔹 Amarillas: {player.get('yellow_cards', 0)}\n"
-        info += f"🔹 Suspendido: {'SÍ 🔴' if player.get('is_suspended') else 'NO 🟢'}"
+        info += f"🔹 Suspendido: {'SÍ 🔴' if player.get('is_suspended') else 'NO 🟢'}\n"
+        
+        # Agregamos la información de deuda
+        if total_debt > 0:
+            info += f"💰 Deuda Total: ${total_debt} ⚠️"
+        else:
+            info += f"💰 Deuda Total: Sin deudas ✅"
         
         return {"success": True, "data": player, "message": info}
 
