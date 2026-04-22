@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from database import supabase
 from schemas import ChatRequest
-from services import intelligence, debts, players
+from services import intelligence, debts, players, attendance
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -57,6 +57,9 @@ async def chat(request: ChatRequest):
     elif action in ["get_player"]:
         name = params.get("player_name")
         result = players.get_player(name)
+        return {"chat": result["message"]}
+    elif action == "upload_attendance":
+        result = attendance.process_attendance_list(request.prompt, request.model)
         return {"chat": result["message"]}
 
     # Si es una charla normal o no detectamos nada especial, devolvemos lo que dijo Ollama
