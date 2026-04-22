@@ -34,7 +34,7 @@ def process_attendance_list(text: str, model: str = "llama3"):
         RESPONDE SOLO JSON:
         {{
             "match_id": "ID",
-            "players": [{"id": "id-o-null", "name_detected": "nombre"}]
+            "players": [{{"id": "id-o-null", "name_detected": "nombre"}}]
         }}
         """
         
@@ -74,4 +74,7 @@ def process_attendance_list(text: str, model: str = "llama3"):
         }
 
     except Exception as e:
+        import traceback
+        print("--- ERROR EN ASISTENCIA ---")
+        print(traceback.format_exc())
         return {"success": False, "message": f"Error en el servicio de asistencia: {str(e)}"}
