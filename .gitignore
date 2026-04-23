@@ -58,3 +58,6 @@ build/
 .idea/
 *.swp
 *.swo
+
+/.agents/skills
+skills-lock.json
