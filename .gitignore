@@ -50,6 +50,7 @@ dist-ssr/
 build/
 .npm/
 .yarn/
+frontend/.env.local
 
 # ================================
 # IDEs and Editors
