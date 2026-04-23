@@ -1,8 +1,17 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from routers import attendance, players, chat, matches
 
-
 app = FastAPI()
+
+# Permitimos peticiones desde el frontend de React
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:5173"],  # La URL donde corre Vite
+    allow_credentials=True,
+    allow_methods=["*"],   # GET, POST, PUT, DELETE, OPTIONS, etc.
+    allow_headers=["*"],   # Content-Type, Authorization, etc.
+)
 
 app.include_router(attendance.router)
 app.include_router(players.router)
