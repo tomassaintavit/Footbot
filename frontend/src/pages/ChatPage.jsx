@@ -39,8 +39,12 @@ function ChatPage({ user }) {
         setIsLoading(true)
 
         try {
-            // Llamamos al backend con el mensaje del usuario y el ID del usuario logueado
-            const response = await sendChatMessage(userText, user.id)
+            // Tomamos los últimos 10 mensajes como historial para el bot
+            // (los mensajes ya incluyen el que acabamos de agregar)
+            const history = messages.slice(-10)
+
+            // Llamamos al backend con el mensaje y el historial
+            const response = await sendChatMessage(userText, user.id, history)
 
             // TODO: Agregar la respuesta del bot a la lista "messages".
             // Tip: el texto de la respuesta viene en response.chat

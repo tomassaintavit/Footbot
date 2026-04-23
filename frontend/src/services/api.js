@@ -1,12 +1,14 @@
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
 
-export async function sendChatMessage(prompt, auth_id, model = "llama3") {
+// history: array de los últimos mensajes para dar memoria al bot
+// Ej: [{ role: 'user', text: '...' }, { role: 'bot', text: '...' }]
+export async function sendChatMessage(prompt, auth_id, history = [], model = "llama3") {
     const response = await fetch(`${API_URL}/chat/`, {
         method: "POST",
         headers: {
             "Content-Type": "application/json"
         },
-        body: JSON.stringify({ prompt, auth_id, model })
+        body: JSON.stringify({ prompt, auth_id, model, history })
     });
 
     if (!response.ok) {
