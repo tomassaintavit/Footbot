@@ -14,7 +14,7 @@ async def chat(request: ChatRequest):
     user = user_query.data[0]
 
     # 2. Le pedimos al servicio de inteligencia que clasifique el mensaje
-    intent = intelligence.extract_intent(request.prompt, request.model)
+    intent = intelligence.extract_intent(request.prompt, request.model, request.history)
     action = intent.get("action")
     params = intent.get("params", {})
     response_text = intent.get("response", "Lo siento, no pude procesar eso.")

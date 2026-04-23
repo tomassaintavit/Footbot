@@ -3,10 +3,18 @@ import json
 
 OLLAMA_URL = "http://localhost:11434/api/generate"
 
-def extract_intent(user_prompt: str, model: str = "llama3"):
+def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
     """
     Usa Ollama para clasificar el mensaje del usuario y devolver un JSON con la intención.
+    Recibe el historial de mensajes anteriores para dar contexto al LLM.
     """
+    # Construimos el historial como texto legible para el LLM
+    # Limitamos a los últimos 10 mensajes para no sobrecargar el contexto
+    history_text = ""
+    for msg in history[-10:]:
+        role = "Usuario" if msg.get("role") == "user" else "Footbot"
+        history_text += f"{role}: {msg.get('text', '')}\n"
+
     prompt_instructions = f"""
     Eres el asistente de Footbot. Tu objetivo es clasificar el mensaje del usuario.
     RESPONDE ÚNICAMENTE EN FORMATO JSON.
@@ -20,6 +28,7 @@ def extract_intent(user_prompt: str, model: str = "llama3"):
     - delete_player: Si se pide eliminar un jugador.
     - update_player: Si se pide modificar un jugador o agregarle datos.
     - get_player: Si se pide obtener información de un jugador.
+    {f'Conversación previa (para contexto):{chr(10)}{history_text}' if history_text else ''}
     Texto del usuario: "{user_prompt}"
     Formato de respuesta (JSON):
     {{
