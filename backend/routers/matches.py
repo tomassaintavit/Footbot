@@ -6,11 +6,7 @@ router = APIRouter(prefix="/matches", tags=["matches"])
 
 @router.post("/sync")
 async def sync_match(match: MatchSync):
-    """
-    Sincroniza un partido oficial desde n8n.
-    Si el partido ya existe (misma fecha y rival), lo actualiza.
-    Si no, lo crea.
-    """
+    print(f"📥 Recibiendo partido para sincronizar: {match.opponent} ({match.match_date})")
     try:
         # Buscamos si ya existe un partido en esa fecha y contra ese rival
         existing = supabase.table("matches").select("*")\
@@ -26,15 +22,16 @@ async def sync_match(match: MatchSync):
         }
 
         if len(existing.data) > 0:
-            # Actualizamos el existente
+            print(f"🔄 Actualizando partido existente ID: {existing.data[0]['id']}")
             response = supabase.table("matches")\
                 .update(match_data)\
                 .eq("id", existing.data[0]["id"])\
                 .execute()
         else:
-            # Insertamos uno nuevo
+            print(f"✨ Insertando nuevo partido contra {match.opponent}")
             response = supabase.table("matches").insert(match_data).execute()
 
+        print(f"✅ Sincronización exitosa. Resultado: {response.data[0] if response.data else 'Sin datos'}")
         return {"status": "success", "data": response.data[0]}
 
     except Exception as e:

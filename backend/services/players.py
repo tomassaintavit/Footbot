@@ -73,22 +73,55 @@ def get_player(name: str):
         debts_query = supabase.table("debts").select("amount").eq("player_id", player_id).execute()
         total_debt = sum(d["amount"] for d in debts_query.data) if debts_query.data else 0
         
-        # 3. Construimos la ficha técnica mejorada
-        info = f"👤 Ficha de {player['name']}:\n"
-        info += f"🔹 Apodo: {player.get('nickname') or '---'}\n"
-        info += f"🔹 DNI: {player.get('dni') or '---'}\n"
-        info += f"🔹 Goles: {player.get('goals', 0)}\n"
-        info += f"🔹 Amarillas: {player.get('yellow_cards', 0)}\n"
-        info += f"🔹 Suspendido: {'SÍ 🔴' if player.get('is_suspended') else 'NO 🟢'}\n"
+        # 3. Construimos la ficha técnica mejorada con saltos de línea claros
+        info = f"👤 **Ficha de {player['name']}**\n"
+        info += f"\n🔹 **Apodo:** {player.get('nickname') or '---'}"
+        info += f"\n🔹 **DNI:** {player.get('dni') or '---'}"
+        info += f"\n🔹 **Goles:** {player.get('goals', 0)}"
+        info += f"\n🔹 **Amarillas:** {player.get('yellow_cards', 0)}"
+        info += f"\n🔹 **Suspendido:** {'SÍ 🔴' if player.get('is_suspended') else 'NO 🟢'}"
         
         # Agregamos la información de deuda
         if total_debt > 0:
-            info += f"💰 Deuda Total: ${total_debt} ⚠️"
+            info += f"\n💰 **Deuda Total:** ${total_debt} ⚠️"
         else:
-            info += f"💰 Deuda Total: Sin deudas ✅"
+            info += f"\n💰 **Deuda Total:** Sin deudas ✅"
+        
+        info += "\n" # Salto final
+
         
         return {"success": True, "data": player, "message": info}
 
     except Exception as e:
         return {"success": False, "message": f"Error al obtener jugador: {str(e)}"}
+    
+def get_players_list():
+    try:
+        # Consultamos todos los jugadores ordenados por nombre
+        players_query = supabase.table("players").select("*").order("name").execute()
+        players_data = players_query.data
+        
+        if not players_data:
+            return {"success": True, "data": [], "message": "🔍 No hay jugadores registrados en el equipo aún."}
+        
+        # Construimos el mensaje amigable con saltos de línea claros
+        message = "📋 **Lista de Jugadores del Equipo:**\n"
+        for i, p in enumerate(players_data, 1):
+            name = p.get("name", "Sin nombre")
+            nickname = f' ({p.get("nickname")})' if p.get("nickname") else ""
+            status = "🔴 (Suspendido)" if p.get("is_suspended") else "🟢"
+            goals = p.get("goals", 0)
+            
+            # Formato con un solo salto de línea
+            message += f"\n{i}. **{name}**{nickname}\n└ {status} | ⚽ {goals} goles"
+
+
+
+
+            
+        return {"success": True, "data": players_data, "message": message}
+
+    except Exception as e:
+        return {"success": False, "message": f"Error al obtener jugadores: {str(e)}"}
+
 

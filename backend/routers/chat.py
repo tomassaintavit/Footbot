@@ -61,6 +61,9 @@ async def chat(request: ChatRequest):
     elif action == "upload_attendance":
         result = attendance.process_attendance_list(request.prompt, request.model)
         return {"chat": result["message"]}
+    elif action == "get_players_list":
+        result = players.get_players_list()
+        return {"chat": result["message"]}
 
     # Si es una charla normal o no detectamos nada especial, devolvemos lo que dijo Ollama
     return {"chat": response_text}

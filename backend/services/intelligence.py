@@ -28,6 +28,8 @@ def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
     - delete_player: Si se pide eliminar un jugador.
     - update_player: Si se pide modificar un jugador o agregarle datos.
     - get_player: Si se pide obtener información de un jugador.
+    - get_players_list: Si se pide obtener una lista de jugadores.
+    - get_next_matches: Si se pide obtener los próximos partidos.
     {f'Conversación previa (para contexto):{chr(10)}{history_text}' if history_text else ''}
     Texto del usuario: "{user_prompt}"
     Formato de respuesta (JSON):
