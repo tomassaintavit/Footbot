@@ -100,11 +100,12 @@ function ChatPage({ user }) {
                         className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                         <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl text-sm ${msg.role === 'user'
+                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl text-sm whitespace-pre-wrap ${msg.role === 'user'
                                 ? 'bg-blue-600 text-white rounded-br-sm'
                                 : 'bg-slate-700 text-slate-100 rounded-bl-sm'
                                 }`}
                         >
+
                             {msg.text}
                         </div>
                     </div>
