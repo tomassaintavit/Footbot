@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from database import supabase
 from schemas import ChatRequest
-from services import intelligence, debts, players, attendance
+from services import intelligence, debts, players, attendance, matches
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -64,6 +64,10 @@ async def chat(request: ChatRequest):
     elif action == "get_players_list":
         result = players.get_players_list()
         return {"chat": result["message"]}
+    elif action == "get_next_matches":
+        result = matches.get_next_matches()
+        return {"chat": result["message"]}
+
 
     # Si es una charla normal o no detectamos nada especial, devolvemos lo que dijo Ollama
     return {"chat": response_text}
