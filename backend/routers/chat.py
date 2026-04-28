@@ -67,6 +67,10 @@ async def chat(request: ChatRequest):
     elif action == "get_next_matches":
         result = matches.get_next_matches()
         return {"chat": result["message"]}
+    elif action == "get_attendance_list":
+        result = attendance.get_match_attendance()
+        return {"chat": result["message"]}
+
 
 
     # Si es una charla normal o no detectamos nada especial, devolvemos lo que dijo Ollama

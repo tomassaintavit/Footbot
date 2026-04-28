@@ -78,3 +78,51 @@ def process_attendance_list(text: str, model: str = "llama3"):
         print("--- ERROR EN ASISTENCIA ---")
         print(traceback.format_exc())
         return {"success": False, "message": f"Error en el servicio de asistencia: {str(e)}"}
+
+def get_match_attendance():
+    """
+    Busca el próximo partido y lista los jugadores que ya están confirmados.
+    """
+    try:
+        # 1. Obtener el próximo partido
+        today_iso = datetime.now().date().isoformat()
+        match_query = supabase.table("matches")\
+            .select("*")\
+            .gte("match_date", today_iso)\
+            .order("match_date")\
+            .limit(1).execute()
+        
+        if not match_query.data:
+            return {"success": False, "message": "🔍 No hay partidos programados próximamente."}
+        
+        match = match_query.data[0]
+        match_id = match["id"]
+        
+        # 2. Obtener los jugadores anotados (hacemos join con la tabla players)
+        attendance_query = supabase.table("attendance")\
+            .select("player_id, players(name, nickname)")\
+            .eq("match_id", match_id)\
+            .execute()
+        
+        players_list = attendance_query.data
+        
+        if not players_list:
+            return {"success": True, "message": f"📝 Aún no hay nadie anotado para el partido contra **{match['opponent']}**."}
+        
+        message = f"✅ **Lista de anotados vs {match['opponent']}:**\n"
+        for i, item in enumerate(players_list, 1):
+            # item['players'] contiene los datos del join
+            player_info = item.get("players")
+            if player_info:
+                name = player_info.get("name", "Sin nombre")
+                nickname = f" ({player_info.get('nickname')})" if player_info.get("nickname") else ""
+                message += f"\n{i}. {name}{nickname}"
+            else:
+                message += f"\n{i}. Jugador desconocido (ID: {item.get('player_id')})"
+            
+        message += f"\n\nTotal: **{len(players_list)}** jugadores."
+        
+        return {"success": True, "message": message}
+    except Exception as e:
+        return {"success": False, "message": f"Error al obtener la lista de asistencia: {str(e)}"}
+
