@@ -31,6 +31,7 @@ def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
     - get_players_list: Si se pide obtener una lista de jugadores.
     - get_next_matches: Si se pide obtener los próximos partidos.
     - get_attendance_list: Si se pide ver quiénes están anotados o confirmados para el partido.
+    - get_positions_table: Si se pide ver la tabla de posiciones del torneo o cómo va el equipo.
 
     {f'Conversación previa (para contexto):{chr(10)}{history_text}' if history_text else ''}
     Texto del usuario: "{user_prompt}"

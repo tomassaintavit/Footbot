@@ -1,1 +1,1 @@
-from . import intelligence, debts, players, attendance
+from . import intelligence, debts, players, attendance, matches, positions

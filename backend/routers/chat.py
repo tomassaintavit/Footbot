@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from database import supabase
 from schemas import ChatRequest
-from services import intelligence, debts, players, attendance, matches
+from services import intelligence, debts, players, attendance, matches, positions
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -69,6 +69,9 @@ async def chat(request: ChatRequest):
         return {"chat": result["message"]}
     elif action == "get_attendance_list":
         result = attendance.get_match_attendance()
+        return {"chat": result["message"]}
+    elif action == "get_positions_table":
+        result = positions.get_positions_table()
         return {"chat": result["message"]}
 
 
