@@ -3,37 +3,38 @@
 ```text
 project-root/
 │
+├── .agents/              (Configuraciones y skills de IA)
 ├── frontend/
 │   ├── src/
-│   │   ├── components/
-│   │   ├── services/
+│   │   ├── assets/       (Imágenes, fuentes, etc.)
+│   │   ├── components/   (Componentes reutilizables)
+│   │   ├── pages/        (Vistas principales de la app)
+│   │   ├── services/     (Lógica de comunicación con el backend)
 │   │   ├── App.jsx
 │   │   └── main.jsx
-│   └── package.json
+│   ├── package.json
+│   ├── vite.config.js
+│   └── tailwind.config.js
 │
 ├── backend/
-│   ├── routers/          (Módulos separados para players, matches, chat, etc)
-│   ├── models/           (Modelos Pydantic / SQLAlchemy)
-│   ├── schemas/          (Estructuras de datos enviadas o recibidas)
-│   ├── main.py           (Entrada principal de FastAPI)
-│   ├── database.py       (Configuración e instancia de conexión a Supabase)
-│   ├── requirements.txt
-│   └── .env
+│   ├── routers/          (Endpoints de FastAPI: players, matches, chat, etc.)
+│   ├── services/         (Lógica de negocio modularizada: Intelligence, Attendance, etc.)
+│   ├── database.py       (Conexión a Supabase)
+│   ├── main.py           (Entrada principal)
+│   ├── schemas.py        (Modelos Pydantic para validación)
+│   ├── .env.example      (Plantilla de variables de entorno)
+│   └── requirements.txt
 │
 ├── n8n/
-│   ├── sync_sheets_debts.json  (Flujo: lee de Google Sheets del Tesorero y envía a Supabase)
-│   └── reminders_workflow.json (Opcional: Flujo para envíos programados y recurrentes)
+│   └── asistencia_workflow.json (Flujo de automatización para asistencias)
 │
 ├── database/
-│   ├── schema.sql
-│   └── seed.sql
+│   └── SUPABASE_ERD.md   (Documentación del esquema de base de datos)
 │
-├── docs/
-│   ├── architecture.md
-│   ├── api.md
-│   └── workflows.md
+├── docs/                 (Documentación adicional del proyecto)
 │
 ├── README.md
-├── STEP_BY_STEP.md
-└── PROJECT_STRUCTURE.md
+├── PROJECT_STRUCTURE.md
+└── skills-lock.json      (Versiones de los skills instalados)
 ```
+
