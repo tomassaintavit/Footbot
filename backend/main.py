@@ -4,14 +4,15 @@ from routers import attendance, players, chat, matches
 
 app = FastAPI()
 
-# Permitimos peticiones desde el frontend de React
+# Permitimos peticiones desde cualquier origen (necesario para producción en Vercel/Render)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # La URL donde corre Vite
+    allow_origins=["*"],   # En producción, permitimos cualquier origen para evitar errores de CORS
     allow_credentials=True,
     allow_methods=["*"],   # GET, POST, PUT, DELETE, OPTIONS, etc.
     allow_headers=["*"],   # Content-Type, Authorization, etc.
 )
+
 
 app.include_router(attendance.router)
 app.include_router(players.router)
