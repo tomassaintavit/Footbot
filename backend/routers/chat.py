@@ -29,7 +29,29 @@ async def chat(request: ChatRequest):
         result = debts.delete_debt_by_player_name(params.get("player_name"))
         return {"chat": result["message"]}
 
+    elif action == "get_help":
+        help_message = """🤖 **¡Soy Footbot! Aquí tienes lo que puedo hacer por el equipo:**
+
+⚽ **Partidos**
+- *¿Cuándo jugamos?*: Te digo el próximo partido.
+- *Tabla de posiciones*: Muestro cómo vamos en el torneo.
+
+📝 **Asistencia**
+- *¿Quiénes van?*: Lista de confirmados para el próximo partido.
+- *Subir lista*: Pega la lista de WhatsApp y yo la proceso.
+
+💸 **Deudas**
+- *¿Quién debe plata?*: Lista de deudores y montos totales.
+
+👤 **Jugadores**
+- *Ver lista de jugadores*: Todos los registrados.
+- *Información de [Nombre]*: Goles, tarjetas y estado de suspensión.
+
+¡Pregúntame lo que necesites!"""
+        return {"chat": help_message}
+
     elif action == "get_debts_list":
+
         result = debts.get_debts_list()
         return {"chat": result["message"]}
 
