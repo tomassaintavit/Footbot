@@ -29,7 +29,12 @@ async def chat(request: ChatRequest):
         result = debts.delete_debt_by_player_name(params.get("player_name"))
         return {"chat": result["message"]}
 
+    elif action == "get_debts_list":
+        result = debts.get_debts_list()
+        return {"chat": result["message"]}
+
     elif action in ["add_debt", "update_debt"]:
+
         amount = params.get("amount", 0)
         result = debts.create_debt_by_player_name(params.get("player_name"), amount)
         return {"chat": result["message"]}

@@ -21,7 +21,9 @@ def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
     Acciones posibles:
     - chat: Charla normal, preguntas de información.
     - delete_debt: Si se pide perdonar, borrar o cancelar una deuda.
+    - get_debts_list: Si se pide ver quiénes deben, la lista de deudores o cuánto debe el equipo en total.
     - update_debt: Marcamos un pago como realizado o modificamos montos.
+
     - upload_attendance: Si se pide subir la lista de asistencia.
     - add_debt: Si se pide agregar una deuda.
     - add_player: Si se pide agregar un jugador.
