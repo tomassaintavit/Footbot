@@ -58,7 +58,7 @@ def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama3-8b-8192", 
+                    "model": "llama-3.3-70b-versatile", 
                     "messages": [
                         {"role": "system", "content": "Eres un asistente que solo responde en JSON."},
                         {"role": "user", "content": system_prompt}
@@ -69,6 +69,8 @@ def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
             response.raise_for_status()
             content = response.json()["choices"][0]["message"]["content"]
             return json.loads(content)
+
+
         else:
             # --- Lógica para OLLAMA (Local) ---
             response = requests.post(OLLAMA_URL, 
