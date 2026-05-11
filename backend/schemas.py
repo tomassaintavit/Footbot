@@ -41,7 +41,7 @@ class PlayerSync(BaseModel):
     is_suspended: bool = False
     suspension_reason: Optional[str] = None
     is_admin: bool = False
-    auth_id: str
+    auth_id: Optional[str] = None
 
 class MatchSync(BaseModel):
     match_date: str  # Formato ISO o similar
