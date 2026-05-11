@@ -56,6 +56,16 @@ A continuación, puedes visualizar la estructura de la base de datos que vamos a
 | `is_paid` | boolean | Por defecto 'false' |
 | `created_at` | timestamp | Fecha de registro de la deuda |
 
+#### AUDIT_LOGS
+| Columna | Tipo de dato | Propósito |
+| :--- | :--- | :--- |
+| `id` | uuid (**PK**) | Generado por defecto |
+| `player_id` | uuid (**FK**) | Admin que realizó la acción |
+| `action` | string | Nombre de la acción (ej: add_debt) |
+| `details` | string | Detalles legibles de la operación |
+| `created_at` | timestamp | Fecha y hora del registro |
+
+
 ## Explicación de las Relaciones
 
 - `players` y `matches` son las tablas principales. Existen de forma independiente.

@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from database import supabase
 from schemas import ChatRequest
-from services import intelligence, debts, players, attendance, matches, positions
+from services import intelligence, debts, players, attendance, matches, positions, logs
+
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -27,6 +28,8 @@ async def chat(request: ChatRequest):
     # 4. Router de Ejecución (El cerebro del bot)
     if action == "delete_debt":
         result = debts.delete_debt_by_player_name(params.get("player_name"))
+        if result.get("success"):
+            logs.create_log(user["id"], "delete_debt", f"Eliminó deudas de {params.get('player_name')}")
         return {"chat": result["message"]}
 
     elif action == "get_help":
@@ -59,14 +62,20 @@ async def chat(request: ChatRequest):
 
         amount = params.get("amount", 0)
         result = debts.create_debt_by_player_name(params.get("player_name"), amount)
+        if result.get("success"):
+            logs.create_log(user["id"], action, f"Añadió/Actualizó deuda de ${amount} a {params.get('player_name')}")
         return {"chat": result["message"]}
     elif action in ["add_player"]:
         name = params.get("player_name")
         result = players.create_player(name)
+        if result.get("success"):
+            logs.create_log(user["id"], "add_player", f"Creó al jugador {name}")
         return {"chat": result["message"]}
     elif action in ["delete_player"]:
         name = params.get("player_name")
         result = players.delete_player(name)
+        if result.get("success"):
+            logs.create_log(user["id"], "delete_player", f"Eliminó al jugador {name}")
         return {"chat": result["message"]}
     elif action == "update_player":
         name = params.get("player_name")
@@ -80,6 +89,8 @@ async def chat(request: ChatRequest):
             red_cards=params.get("red_cards"),
             is_suspended=params.get("is_suspended")
         )
+        if result.get("success"):
+            logs.create_log(user["id"], "update_player", f"Actualizó datos de {name}")
         return {"chat": result["message"]}
     elif action in ["get_player"]:
         name = params.get("player_name")
