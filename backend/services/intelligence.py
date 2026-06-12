@@ -58,7 +58,8 @@ def extract_intent(user_prompt: str, model: str = "llama3", history: list = []):
                     "Content-Type": "application/json"
                 },
                 json={
-                    "model": "llama-3.3-70b-versatile", 
+                    # "model": "llama-3.3-70b-versatile", 
+                    "model": "openai/gpt-oss-20b" ,
                     "messages": [
                         {"role": "system", "content": "Eres un asistente que solo responde en JSON."},
                         {"role": "user", "content": system_prompt}
