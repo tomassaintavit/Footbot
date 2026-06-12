@@ -24,3 +24,6 @@ python-dateutil==2.9.0
 
 # Supabase
 supabase
+
+# Telegram Bot
+python-telegram-bot==21.11.1

@@ -1,8 +1,21 @@
+import logging
+from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from routers import attendance, players, chat, matches
 
-app = FastAPI()
+logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    from services.telegram_bot import start_bot, stop_bot
+    await start_bot()
+    yield
+    await stop_bot()
+
+
+app = FastAPI(lifespan=lifespan)
 
 # Permitimos peticiones desde cualquier origen (necesario para producción en Vercel/Render)
 app.add_middleware(
