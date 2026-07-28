@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import Conflict as TelegramConflict
 
 from database import supabase
-from services import intelligence, debts, players, attendance, matches, positions, logs
+from services import intelligence, debts, players, attendance, matches, positions, logs, torneo_sync
 
 logger = logging.getLogger(__name__)
 
@@ -127,7 +127,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /partidos — Próximos partidos\n"
         "• /asistencia — Confirmados\n"
         "• /posiciones — Tabla de posiciones\n\n"
-        "<b>Admin:</b> /nuevo_jugador, /borrar_jugador, /actualizar_jugador, /nueva_deuda, /borrar_deuda"
+        "<b>Admin:</b> /nuevo_jugador, /borrar_jugador, /actualizar_jugador, /nueva_deuda, /borrar_deuda, /sincronizar"
     )
 
 
@@ -145,7 +145,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /borrar_jugador — Eliminar jugador\n"
         "• /actualizar_jugador — Modificar datos\n"
         "• /nueva_deuda — Cargar deuda\n"
-        "• /borrar_deuda — Eliminar deudas\n\n"
+        "• /borrar_deuda — Eliminar deudas\n"
+        "• /sincronizar — Sincronizar datos con Torneo Golden\n\n"
         "<b>Vincular jugador</b>\n"
         "• /link Nombre TelegramID — Asocia un jugador a su Telegram\n"
         "  El jugador obtiene su ID de @userinfobot\n\n"
@@ -242,6 +243,28 @@ async def posiciones_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
     result = positions.get_positions_table()["message"]
     await update.message.reply_text(result)
+
+
+async def sincronizar_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _admin_only(update):
+        return
+    await update.message.reply_text("🔄 Sincronizando con Torneo Golden...")
+    try:
+        result = torneo_sync.sync_all()
+        msg = "✅ <b>Sincronización completa</b>\n\n"
+        if result["players"]["success"]:
+            msg += f"👥 <b>Jugadores:</b> {result['players']['inserted']} nuevos, {result['players']['updated']} actualizados"
+            if result['players']['errors']:
+                msg += f", {result['players']['errors']} errores"
+            msg += "\n"
+        if result["positions"]["success"]:
+            msg += f"📊 <b>Posiciones:</b> {result['positions'].get('message', f'{result[\"positions\"][\"inserted\"]} registros')}\n"
+        if result["matches"]["success"]:
+            msg += f"⚽ <b>Partidos:</b> {result['matches']['synced']} sincronizados\n"
+        await update.message.reply_text(msg)
+    except Exception as e:
+        logger.exception("Error en sincronización")
+        await update.message.reply_text(f"❌ Error al sincronizar: {str(e)}")
 
 
 # ── Conversation states ──────────────────────────────────────────
@@ -738,6 +761,7 @@ async def start_bot():
     _application.add_handler(CommandHandler("partidos", partidos_command))
     _application.add_handler(CommandHandler("asistencia", asistencia_command))
     _application.add_handler(CommandHandler("posiciones", posiciones_command))
+    _application.add_handler(CommandHandler("sincronizar", sincronizar_command))
     _application.add_handler(conv_handler)
     _application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_message))
 
