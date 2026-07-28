@@ -16,20 +16,9 @@ TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 _application: Application | None = None
 
 
-def find_or_link_player(telegram_id: str, telegram_name: str = None):
+def find_player_by_telegram_id(telegram_id: str):
     query = supabase.table("players").select("*").eq("telegram_id", telegram_id).execute()
-    if query.data:
-        return query.data[0]
-
-    if telegram_name:
-        query = supabase.table("players").select("*").ilike("name", telegram_name).execute()
-        if query.data:
-            player = query.data[0]
-            supabase.table("players").update({"telegram_id": telegram_id}).eq("id", player["id"]).execute()
-            logger.info(f"Jugador '{player['name']}' vinculado con Telegram ID {telegram_id}")
-            return player
-
-    return None
+    return query.data[0] if query.data else None
 
 
 def process_message(player, text: str, model: str = "llama3") -> str:
@@ -138,8 +127,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /partidos — Próximos partidos\n"
         "• /asistencia — Confirmados\n"
         "• /posiciones — Tabla de posiciones\n\n"
-        "<b>Admin:</b> /nuevo_jugador, /borrar_jugador, /actualizar_jugador, /nueva_deuda, /borrar_deuda\n\n"
-        "Ej: ¿Cuándo jugamos?, ¿Quiénes van?, ¿Cuánto debe Tomás?"
+        "<b>Admin:</b> /nuevo_jugador, /borrar_jugador, /actualizar_jugador, /nueva_deuda, /borrar_deuda"
     )
 
 
@@ -158,82 +146,99 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /actualizar_jugador — Modificar datos\n"
         "• /nueva_deuda — Cargar deuda\n"
         "• /borrar_deuda — Eliminar deudas\n\n"
-        "<b>Vincular cuenta</b>\n"
-        "• /link Tu Nombre — Vincular Telegram con tu perfil\n\n"
+        "<b>Vincular jugador</b>\n"
+        "• /link Nombre TelegramID — Asocia un jugador a su Telegram\n"
+        "  El jugador obtiene su ID de @userinfobot\n\n"
         "<b>Cancelar</b>\n"
-        "• /cancelar — Cancela cualquier operación en curso"
+        "• /cancelar — Cancela cualquier operación en curso\n\n"
+        "🔐 El bot es solo para administradores del equipo."
     )
 
 
 async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    name = " ".join(context.args) if context.args else ""
-
-    if not name:
+    caller_id = str(update.effective_user.id)
+    caller = find_player_by_telegram_id(caller_id)
+    if not caller or not caller.get("is_admin"):
         await update.message.reply_text(
-            "Usá `/link Tu Nombre` para vincular tu cuenta de Telegram con tu perfil de Footbot."
+            "⛔ Solo administradores pueden vincular jugadores.\n"
+            "Pedile al admin de tu equipo que te registre."
         )
         return
+
+    args = context.args or []
+    if len(args) < 2:
+        await update.message.reply_text(
+            "Usá: <code>/link NombreDelJugador TelegramUserId</code>\n\n"
+            "El jugador obtiene su ID mandándole cualquier mensaje a @userinfobot."
+        )
+        return
+
+    name = " ".join(args[:-1])
+    target_telegram_id = args[-1]
+    target_telegram_id = target_telegram_id.lstrip("@")
 
     query = supabase.table("players").select("*").ilike("name", name).execute()
     if not query.data:
         await update.message.reply_text(f"No encontré ningún jugador con el nombre '{name}'.")
         return
 
+    existing = supabase.table("players").select("id").eq("telegram_id", target_telegram_id).execute()
+    if existing.data:
+        other = existing.data[0]
+        if other["id"] != query.data[0]["id"]:
+            await update.message.reply_text("❌ Ese Telegram ID ya está vinculado a otro jugador.")
+            return
+
     player = query.data[0]
-    supabase.table("players").update({"telegram_id": telegram_id}).eq("id", player["id"]).execute()
-    logger.info(f"Jugador '{player['name']}' vinculado manualmente con Telegram ID {telegram_id}")
+    supabase.table("players").update({"telegram_id": target_telegram_id}).eq("id", player["id"]).execute()
+    logger.info(f"Admin '{caller['name']}' vinculó a '{player['name']}' con Telegram ID {target_telegram_id}")
     await update.message.reply_text(
-        f"✅ ¡Listo! Vinculé tu Telegram con <b>{player['name']}</b>.\n"
-        f"{'🔑 Tenés permisos de administrador.' if player.get('is_admin') else ''}"
+        f"✅ Vinculaste a <b>{player['name']}</b> con Telegram ID {target_telegram_id}.\n"
+        f"{'🔑 Tiene permisos de administrador.' if player.get('is_admin') else ''}"
     )
 
 
-async def jugadores_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    player = find_or_link_player(telegram_id)
+async def _admin_only(update: Update) -> bool:
+    player = find_player_by_telegram_id(str(update.effective_user.id))
     if not player:
-        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+        await update.message.reply_text("No estás registrado. Pedile al admin que te vincule con /link.")
+        return False
+    if not player.get("is_admin"):
+        await update.message.reply_text("⛔ Solo administradores.")
+        return False
+    return True
+
+
+async def jugadores_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _admin_only(update):
         return
     result = players.get_players_list()["message"]
     await update.message.reply_text(result)
 
 
 async def deudas_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    player = find_or_link_player(telegram_id)
-    if not player:
-        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+    if not await _admin_only(update):
         return
     result = debts.get_debts_list()["message"]
     await update.message.reply_text(result)
 
 
 async def partidos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    player = find_or_link_player(telegram_id)
-    if not player:
-        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+    if not await _admin_only(update):
         return
     result = matches.get_next_matches()["message"]
     await update.message.reply_text(result)
 
 
 async def asistencia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    player = find_or_link_player(telegram_id)
-    if not player:
-        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+    if not await _admin_only(update):
         return
     result = attendance.get_match_attendance()["message"]
     await update.message.reply_text(result)
 
 
 async def posiciones_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    telegram_id = str(update.effective_user.id)
-    player = find_or_link_player(telegram_id)
-    if not player:
-        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+    if not await _admin_only(update):
         return
     result = positions.get_positions_table()["message"]
     await update.message.reply_text(result)
@@ -269,8 +274,9 @@ FIELD_KEYWORDS = {
 }
 
 
-def _get_player_or_none(telegram_id: str):
-    return find_or_link_player(telegram_id)
+def find_player_by_telegram_id(telegram_id: str):
+    query = supabase.table("players").select("*").eq("telegram_id", telegram_id).execute()
+    return query.data[0] if query.data else None
 
 
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -281,7 +287,7 @@ async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /nuevo_jugador ───────────────────────────────────────────────
 
 async def nj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player = _get_player_or_none(str(update.effective_user.id))
+    player = find_player_by_telegram_id(str(update.effective_user.id))
     if not player or not player.get("is_admin"):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
@@ -339,7 +345,7 @@ async def nj_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /borrar_jugador ──────────────────────────────────────────────
 
 async def bj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player = _get_player_or_none(str(update.effective_user.id))
+    player = find_player_by_telegram_id(str(update.effective_user.id))
     if not player or not player.get("is_admin"):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
@@ -373,7 +379,7 @@ async def bj_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /nueva_deuda ─────────────────────────────────────────────────
 
 async def nd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player = _get_player_or_none(str(update.effective_user.id))
+    player = find_player_by_telegram_id(str(update.effective_user.id))
     if not player or not player.get("is_admin"):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
@@ -421,7 +427,7 @@ async def nd_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /borrar_deuda ────────────────────────────────────────────────
 
 async def bd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player = _get_player_or_none(str(update.effective_user.id))
+    player = find_player_by_telegram_id(str(update.effective_user.id))
     if not player or not player.get("is_admin"):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
@@ -455,7 +461,7 @@ async def bd_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # ── /actualizar_jugador ──────────────────────────────────────────
 
 async def uj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    player = _get_player_or_none(str(update.effective_user.id))
+    player = find_player_by_telegram_id(str(update.effective_user.id))
     if not player or not player.get("is_admin"):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
@@ -579,13 +585,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     telegram_id = str(user.id)
     text = update.message.text.strip()
 
-    player = find_or_link_player(telegram_id, user.first_name)
+    player = find_player_by_telegram_id(telegram_id)
     if not player:
         await update.message.reply_text(
-            f"Hola {user.first_name}! 👋\n\n"
-            "No encontré tu cuenta en Footbot. Para registrarte:\n\n"
-            "1️⃣ Un administrador debe darte de alta desde la web\n"
-            "2️⃣ Después envía cualquier mensaje acá para vincular tu cuenta"
+            "No estás registrado en Footbot.\n"
+            "Pedile al administrador que te vincule."
         )
         return
 
