@@ -4,6 +4,8 @@ from database import supabase
 
 router = APIRouter(prefix="/players", tags=["players"])
 
+PROTECTED_FIELDS = {"is_admin", "telegram_id", "auth_id"}
+
 @router.post("/")
 async def create_player(player: Player):
     try:
@@ -22,37 +24,25 @@ async def sync_player(player: PlayerSync):
     """
     Sincroniza un jugador desde la API oficial.
     Usa el DNI como clave para actualizar si ya existe.
+    Nunca pisa campos protegidos (is_admin, telegram_id, auth_id).
     """
     try:
-        # Buscamos si ya existe el jugador por DNI (o por nombre si no hay DNI)
         query = supabase.table("players").select("*")
         if player.dni:
             query = query.eq("dni", player.dni)
         else:
             query = query.eq("name", player.name)
-        
+
         existing = query.execute()
-        
-        player_data = {
-            "name": player.name,
-            "nickname": player.nickname,
-            "dni": player.dni,
-            "email": player.email,
-            "goals": player.goals,
-            "yellow_cards": player.yellow_cards,
-            "red_cards": player.red_cards,
-            "is_suspended": player.is_suspended,
-            "suspension_reason": player.suspension_reason
-        }
+
+        player_data = player.model_dump(exclude=PROTECTED_FIELDS)
 
         if len(existing.data) > 0:
-            # Actualizamos el existente
             response = supabase.table("players")\
                 .update(player_data)\
                 .eq("id", existing.data[0]["id"])\
                 .execute()
         else:
-            # Insertamos uno nuevo
             response = supabase.table("players").insert(player_data).execute()
 
         return {"status": "success", "data": response.data[0]}
