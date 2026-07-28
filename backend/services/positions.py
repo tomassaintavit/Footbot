@@ -16,22 +16,20 @@ def get_positions_table():
                 "message": "📊 La tabla de posiciones aún no tiene datos cargados. ¡Pronto habrá novedades!"
             }
         
-        # Construimos el mensaje con un formato de tabla simple en Markdown
-        message = "🏆 **Tabla de Posiciones - Zona 2**\n"
-        message += "\n`Pos | Equipo          | Pts | PJ | DG`"
-        message += "\n`--------------------------------------`"
-        
+        message = "🏆 <b>Tabla de Posiciones - Zona 2</b>\n<pre>\n"
+        message += f"{'#'.ljust(3)} {'Equipo'.ljust(15)} {'Pts'.rjust(4)} {'PJ'.rjust(3)} {'DG'.rjust(4)}\n"
+        message += f"{'─'*3} {'─'*15} {'─'*4} {'─'*3} {'─'*4}\n"
+
         for p in positions_data:
             pos = str(p.get("position", "-")).ljust(3)
-            # Acortamos el nombre si es muy largo para que no rompa la "tabla" visual
             name = p.get("team_name", "Equipo")[:15].ljust(15)
-            pts = str(p.get("points", 0)).ljust(3)
-            pj = str(p.get("played", 0)).ljust(2)
-            dg = str(p.get("goal_diff", 0))
-            
-            message += f"\n`{pos} | {name} | {pts} | {pj} | {dg}`"
-            
-        message += "\n\n_Datos actualizados desde Torneo Golden._"
+            pts = str(p.get("points", 0)).rjust(4)
+            pj = str(p.get("played", 0)).rjust(3)
+            dg = str(p.get("goal_diff", 0)).rjust(4)
+
+            message += f"{pos} {name} {pts} {pj} {dg}\n"
+
+        message += "</pre>\n<i>Datos actualizados desde Torneo Golden.</i>"
         
         return {"success": True, "data": positions_data, "message": message}
 

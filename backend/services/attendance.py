@@ -107,20 +107,22 @@ def get_match_attendance():
         players_list = attendance_query.data
         
         if not players_list:
-            return {"success": True, "message": f"📝 Aún no hay nadie anotado para el partido contra **{match['opponent']}**."}
+            return {"success": True, "message": f"📝 Aún no hay nadie anotado para el partido contra <b>{match['opponent']}</b>."}
         
-        message = f"✅ **Lista de anotados vs {match['opponent']}:**\n"
+        message = f"✅ <b>Anotados vs {match['opponent']}</b>\n<pre>\n"
         for i, item in enumerate(players_list, 1):
-            # item['players'] contiene los datos del join
             player_info = item.get("players")
             if player_info:
                 name = player_info.get("name", "Sin nombre")
-                nickname = f" ({player_info.get('nickname')})" if player_info.get("nickname") else ""
-                message += f"\n{i}. {name}{nickname}"
+                nickname = player_info.get("nickname") or ""
+                mess = f"{i:>2}. {name}"
+                if nickname:
+                    mess += f" ({nickname})"
+                message += f"{mess}\n"
             else:
-                message += f"\n{i}. Jugador desconocido (ID: {item.get('player_id')})"
-            
-        message += f"\n\nTotal: **{len(players_list)}** jugadores."
+                message += f"{i:>2}. Jugador desconocido\n"
+        message += f"\nTotal: {len(players_list)} jugadores.\n"
+        message += "</pre>"
         
         return {"success": True, "message": message}
     except Exception as e:

@@ -1,7 +1,10 @@
 import os
+import asyncio
 import logging
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler
+from telegram.constants import ParseMode
+from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, Defaults
+from telegram.error import Conflict as TelegramConflict
 
 from database import supabase
 from services import intelligence, debts, players, attendance, matches, positions, logs
@@ -47,18 +50,18 @@ def process_message(player, text: str, model: str = "llama3") -> str:
 
     elif action == "get_help":
         return (
-            "🤖 **¡Soy Footbot! Aquí tienes lo que puedo hacer por el equipo:**\n\n"
-            "⚽ **Partidos**\n"
-            "• *¿Cuándo jugamos?* → Próximo partido\n"
-            "• *Tabla de posiciones* → Cómo vamos en el torneo\n\n"
-            "📝 **Asistencia**\n"
-            "• *¿Quiénes van?* → Confirmados para el próximo partido\n"
-            "• *Subir lista* → Pega la lista de WhatsApp y la proceso\n\n"
-            "💸 **Deudas**\n"
-            "• *¿Quién debe plata?* → Deudores y montos\n\n"
-            "👤 **Jugadores**\n"
-            "• *Ver lista* → Todos los registrados\n"
-            "• *Información de [Nombre]* → Goles, tarjetas, suspensión\n\n"
+            "🤖 <b>¡Soy Footbot! Aquí tienes lo que puedo hacer por el equipo:</b>\n\n"
+            "⚽ <b>Partidos</b>\n"
+            "• ¿Cuándo jugamos? → Próximo partido\n"
+            "• Tabla de posiciones → Cómo vamos en el torneo\n\n"
+            "📝 <b>Asistencia</b>\n"
+            "• ¿Quiénes van? → Confirmados para el próximo partido\n"
+            "• Subir lista → Pega la lista de WhatsApp y la proceso\n\n"
+            "💸 <b>Deudas</b>\n"
+            "• ¿Quién debe plata? → Deudores y montos\n\n"
+            "👤 <b>Jugadores</b>\n"
+            "• Ver lista → Todos los registrados\n"
+            "• Información de [Nombre] → Goles, tarjetas, suspensión\n\n"
             "¡Pregúntame lo que necesites!"
         )
 
@@ -127,37 +130,38 @@ def process_message(player, text: str, model: str = "llama3") -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(
-        f"⚽ ¡Hola {user.first_name}! Soy **Footbot**, tu asistente del equipo.\n\n"
+        f"⚽ ¡Hola {user.first_name}! Soy <b>Footbot</b>, tu asistente del equipo.\n\n"
         "Escribime con lenguaje natural o usá los comandos:\n\n"
-        "📋 **Comandos:**\n"
-        "• `/jugadores` — Lista de jugadores\n"
-        "• `/deudas` — Deudas pendientes\n"
-        "• `/partidos` — Próximos partidos\n"
-        "• `/asistencia` — Confirmados\n"
-        "• `/posiciones` — Tabla de posiciones\n\n"
-        "🔧 **Admin:** `/nuevo_jugador`, `/borrar_jugador`, `/actualizar_jugador`, `/nueva_deuda`, `/borrar_deuda`\n\n"
-        "Ej: *¿Cuándo jugamos?*, *¿Quiénes van?*, *¿Cuánto debe Tomás?*"
+        "<b>Comandos:</b>\n"
+        "• /jugadores — Lista de jugadores\n"
+        "• /deudas — Deudas pendientes\n"
+        "• /partidos — Próximos partidos\n"
+        "• /asistencia — Confirmados\n"
+        "• /posiciones — Tabla de posiciones\n\n"
+        "<b>Admin:</b> /nuevo_jugador, /borrar_jugador, /actualizar_jugador, /nueva_deuda, /borrar_deuda\n\n"
+        "Ej: ¿Cuándo jugamos?, ¿Quiénes van?, ¿Cuánto debe Tomás?"
     )
 
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
-        "🤖 **Footbot — Comandos disponibles**\n\n"
-        "📋 **Información**\n"
-        "• `/jugadores` — Lista de jugadores\n"
-        "• `/deudas` — Deudas pendientes\n"
-        "• `/partidos` — Próximos partidos\n"
-        "• `/asistencia` — Confirmados\n"
-        "• `/posiciones` — Tabla de posiciones\n\n"
-        "🔧 **Administración**\n"
-        "• `/nuevo_jugador` — Agregar jugador (paso a paso)\n"
-        "• `/borrar_jugador` — Eliminar jugador\n"
-        "• `/actualizar_jugador` — Modificar datos\n"
-        "• `/nueva_deuda` — Cargar deuda\n"
-        "• `/borrar_deuda` — Eliminar deudas\n\n"
-        "🔗 **Vincular cuenta**\n"
-        "• `/link Tu Nombre` — Vincular Telegram con tu perfil\n\n"
-        "❌ `/cancelar` — Cancela cualquier operación en curso"
+        "🤖 <b>Footbot — Comandos disponibles</b>\n\n"
+        "<b>Información</b>\n"
+        "• /jugadores — Lista de jugadores\n"
+        "• /deudas — Deudas pendientes\n"
+        "• /partidos — Próximos partidos\n"
+        "• /asistencia — Confirmados\n"
+        "• /posiciones — Tabla de posiciones\n\n"
+        "<b>Administración</b>\n"
+        "• /nuevo_jugador — Agregar jugador\n"
+        "• /borrar_jugador — Eliminar jugador\n"
+        "• /actualizar_jugador — Modificar datos\n"
+        "• /nueva_deuda — Cargar deuda\n"
+        "• /borrar_deuda — Eliminar deudas\n\n"
+        "<b>Vincular cuenta</b>\n"
+        "• /link Tu Nombre — Vincular Telegram con tu perfil\n\n"
+        "<b>Cancelar</b>\n"
+        "• /cancelar — Cancela cualquier operación en curso"
     )
 
 
@@ -180,7 +184,7 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     supabase.table("players").update({"telegram_id": telegram_id}).eq("id", player["id"]).execute()
     logger.info(f"Jugador '{player['name']}' vinculado manualmente con Telegram ID {telegram_id}")
     await update.message.reply_text(
-        f"✅ ¡Listo! Vinculé tu Telegram con **{player['name']}**.\n"
+        f"✅ ¡Listo! Vinculé tu Telegram con <b>{player['name']}</b>.\n"
         f"{'🔑 Tenés permisos de administrador.' if player.get('is_admin') else ''}"
     )
 
@@ -282,19 +286,19 @@ async def nj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
     context.user_data["admin_player"] = player
-    await update.message.reply_text("🏃 **Nombre del nuevo jugador:**")
+    await update.message.reply_text("🏃 <b>Nombre del nuevo jugador:</b>")
     return NJ_NAME
 
 async def nj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["nj_name"] = update.message.text.strip()
-    await update.message.reply_text("📝 **Apodo** (opcional, `-` para saltar):")
+    await update.message.reply_text("📝 <b>Apodo</b> (opcional, - para saltar):")
     return NJ_NICKNAME
 
 async def nj_nickname(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
     if text != "-":
         context.user_data["nj_nickname"] = text
-    await update.message.reply_text("📄 **DNI** (opcional, `-` para saltar):")
+    await update.message.reply_text("📄 <b>DNI</b> (opcional, - para saltar):")
     return NJ_DNI
 
 async def nj_dni(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -305,11 +309,11 @@ async def nj_dni(update: Update, context: ContextTypes.DEFAULT_TYPE):
     nickname = context.user_data.get("nj_nickname", "—")
     dni = context.user_data.get("nj_dni", "—")
     await update.message.reply_text(
-        f"**Resumen:**\n"
+        f"<b>Resumen:</b>\n"
         f"👤 Nombre: {name}\n"
         f"📝 Apodo: {nickname}\n"
         f"📄 DNI: {dni}\n\n"
-        f"✅ Escribí `si` para confirmar\n"
+        f"✅ Escribí si para confirmar\n"
         f"❌ Cualquier otra cosa para cancelar"
     )
     return NJ_CONFIRMAR
@@ -340,14 +344,14 @@ async def bj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
     context.user_data["admin_player"] = player
-    await update.message.reply_text("🗑️ **Nombre del jugador a eliminar:**")
+    await update.message.reply_text("🗑️ <b>Nombre del jugador a eliminar:</b>")
     return BJ_NAME
 
 async def bj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["bj_name"] = update.message.text.strip()
     await update.message.reply_text(
-        f"¿Eliminar a **{context.user_data['bj_name']}**?\n\n"
-        f"✅ Escribí `si` para confirmar\n"
+        f"¿Eliminar a <b>{context.user_data['bj_name']}</b>?\n\n"
+        f"✅ Escribí si para confirmar\n"
         f"❌ Cualquier otra cosa para cancelar"
     )
     return BJ_CONFIRMAR
@@ -374,12 +378,12 @@ async def nd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
     context.user_data["admin_player"] = player
-    await update.message.reply_text("💸 **Nombre del jugador:**")
+    await update.message.reply_text("💸 <b>Nombre del jugador:</b>")
     return ND_NAME
 
 async def nd_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["nd_name"] = update.message.text.strip()
-    await update.message.reply_text("💰 **Monto de la deuda:**\n(Ej: 5000)")
+    await update.message.reply_text("💰 <b>Monto de la deuda:</b>\n(Ej: 5000)")
     return ND_AMOUNT
 
 async def nd_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -387,10 +391,10 @@ async def nd_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
         amount = float(update.message.text.strip().replace("$", "").replace(",", ""))
         context.user_data["nd_amount"] = amount
         await update.message.reply_text(
-            f"**Resumen:**\n"
+            f"<b>Resumen:</b>\n"
             f"👤 Jugador: {context.user_data['nd_name']}\n"
             f"💰 Monto: ${amount:,.0f}\n\n"
-            f"✅ Escribí `si` para confirmar\n"
+            f"✅ Escribí si para confirmar\n"
             f"❌ Cualquier otra cosa para cancelar"
         )
         return ND_CONFIRMAR
@@ -422,14 +426,14 @@ async def bd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
     context.user_data["admin_player"] = player
-    await update.message.reply_text("🗑️ **Nombre del jugador para borrarle la deuda:**")
+    await update.message.reply_text("🗑️ <b>Nombre del jugador para borrarle la deuda:</b>")
     return BD_NAME
 
 async def bd_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["bd_name"] = update.message.text.strip()
     await update.message.reply_text(
-        f"¿Borrar todas las deudas de **{context.user_data['bd_name']}**?\n\n"
-        f"✅ Escribí `si` para confirmar\n"
+        f"¿Borrar todas las deudas de <b>{context.user_data['bd_name']}</b>?\n\n"
+        f"✅ Escribí si para confirmar\n"
         f"❌ Cualquier otra cosa para cancelar"
     )
     return BD_CONFIRMAR
@@ -456,7 +460,7 @@ async def uj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Solo administradores.")
         return ConversationHandler.END
     context.user_data["admin_player"] = player
-    await update.message.reply_text("👤 **Nombre del jugador a actualizar:**")
+    await update.message.reply_text("👤 <b>Nombre del jugador a actualizar:</b>")
     return UJ_NAME
 
 async def uj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -468,8 +472,8 @@ async def uj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data["uj_player"] = result["data"]
     context.user_data["uj_name"] = name
     msg = (
-        f"**Jugador:** {name}\n\n"
-        f"**¿Qué campo querés actualizar?**\n\n"
+        f"<b>Jugador:</b> {name}\n\n"
+        f"<b>¿Qué campo querés actualizar?</b>\n\n"
     )
     for k, (field, label) in EDITABLE_FIELDS.items():
         msg += f"`{k}` → {label}\n"
@@ -490,7 +494,7 @@ async def uj_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("❌ Campo inválido. Elegí un número de la lista.")
         return UJ_FIELD
     await update.message.reply_text(
-        f"**Nuevo valor para {context.user_data['uj_field_label']}:**"
+        f"<b>Nuevo valor para {context.user_data['uj_field_label']}:</b>"
     )
     return UJ_VALUE
 
@@ -505,11 +509,11 @@ async def uj_value(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["uj_value"] = value
         display = value
     await update.message.reply_text(
-        f"**Resumen:**\n"
+        f"<b>Resumen:</b>\n"
         f"👤 Jugador: {context.user_data['uj_name']}\n"
         f"✏️ Campo: {context.user_data['uj_field_label']}\n"
         f"📝 Nuevo valor: {display}\n\n"
-        f"✅ Escribí `si` para confirmar\n"
+        f"✅ Escribí si para confirmar\n"
         f"❌ Cualquier otra cosa para cancelar"
     )
     return UJ_CONFIRMAR
@@ -596,7 +600,7 @@ async def start_bot():
         logger.warning("TELEGRAM_BOT_TOKEN no está configurado. Bot de Telegram desactivado.")
         return
 
-    _application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
+    _application = Application.builder().token(TELEGRAM_BOT_TOKEN).defaults(Defaults(parse_mode=ParseMode.HTML)).build()
 
     _application.add_handler(CommandHandler("start", start))
     _application.add_handler(CommandHandler("help", help_command))
@@ -611,10 +615,19 @@ async def start_bot():
 
     await _application.initialize()
     await _application.bot.delete_webhook(drop_pending_updates=True)
-    await _application.bot.get_updates(timeout=0, offset=-1)
-    logger.info("Conexiones previas de Telegram limpiadas")
     await _application.start()
-    await _application.updater.start_polling()
+    for attempt in range(3):
+        try:
+            await _application.updater.start_polling()
+            break
+        except TelegramConflict:
+            if attempt < 2:
+                wait = (attempt + 1) * 5
+                logger.warning(f"Conflicto con otra instancia, reintentando en {wait}s...")
+                await asyncio.sleep(wait)
+            else:
+                logger.error("No se pudo iniciar el bot después de 3 intentos.")
+                raise
     logger.info("Bot de Telegram iniciado en modo polling")
 
 

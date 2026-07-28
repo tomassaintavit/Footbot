@@ -75,7 +75,7 @@ def get_debts_list():
         if not debts_data:
             return {
                 "success": True, 
-                "message": "✅ **¡Buenas noticias!** No hay deudas pendientes en el equipo."
+                "message": "✅ <b>¡Buenas noticias!</b> No hay deudas pendientes en el equipo."
             }
         
         # 2. Agrupar montos por jugador
@@ -88,17 +88,23 @@ def get_debts_list():
                 amount = d.get("amount", 0)
                 summary[name] = summary.get(name, 0) + amount
         
-        # 3. Formatear el mensaje de respuesta
-        message = "💸 **Lista de Deudas Pendientes**\n"
+        message = "💸 <b>Deudas Pendientes</b>\n<pre>\n"
         total_team_debt = 0
-        
-        # Ordenamos por nombre para que sea más fácil de leer
+
+        name_width = max(len(n) for n in summary.keys()) if summary else 10
+        name_width = max(name_width, 10)
+
+        message += f"{'Jugador'.ljust(name_width)}  {'Deuda':>10}\n"
+        message += f"{'─' * name_width}  {'─' * 10}\n"
+
         for player in sorted(summary.keys()):
             amount = summary[player]
-            message += f"\n- {player}: **${amount:,.0f}**"
+            message += f"{player.ljust(name_width)}  ${amount:>8,.0f}\n"
             total_team_debt += amount
-            
-        message += f"\n\nTotal pendiente: **${total_team_debt:,.0f}**"
+
+        message += f"{'─' * name_width}  {'─' * 10}\n"
+        message += f"{'Total'.ljust(name_width)}  ${total_team_debt:>8,.0f}\n"
+        message += "</pre>"
         
         return {"success": True, "message": message}
         

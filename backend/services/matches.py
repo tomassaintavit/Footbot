@@ -13,23 +13,20 @@ def get_next_matches():
         if not next_matches:
             return {"success": True, "data": [], "message": "📅 No hay partidos programados próximamente."}
         
-        message = "🗓️ **Próximos Partidos:**\n"
+        message = "🗓️ <b>Próximos Partidos</b>\n<pre>\n"
         for m in next_matches:
-            # Formateamos la fecha si es posible (asumiendo YYYY-MM-DD)
             try:
                 date_obj = datetime.strptime(m["match_date"], "%Y-%m-%d")
-                friendly_date = date_obj.strftime("%d/%m (%A)") # Ej: 28/04 (Tuesday)
+                friendly_date = date_obj.strftime("%d/%m (%A)")
             except:
                 friendly_date = m["match_date"]
 
-            opponent = m.get("opponent", "Rival por confirmar")
-            field = m.get("field") or m.get("location") or "Cancha por confirmar"
-            hour = m.get("match_time") or ""
-            
-            message += f"\n⚽ **vs {opponent}**"
-            message += f"\n📅 {friendly_date} {hour}"
-            message += f"\n📍 {field}\n"
-            
+            opponent = m.get("opponent", "Rival por confirmar")[:22].ljust(22)
+            field = (m.get("field") or m.get("location") or "Cancha por confirmar")[:15].ljust(15)
+            hour = (m.get("match_time") or "").rjust(5)
+
+            message += f"{friendly_date}  {hour}  vs {opponent}  {field}\n"
+        message += "</pre>"
         return {"success": True, "data": next_matches, "message": message}
     except Exception as e:
         return {"success": False, "message": f"Error al obtener los próximos partidos: {str(e)}"}
