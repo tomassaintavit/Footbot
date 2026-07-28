@@ -109,8 +109,13 @@ def sync_matches() -> dict:
 
     synced = 0
     for fecha in fechas:
-        match_date = fecha.get("fecha", "")[:10]
+        raw_date = fecha.get("fecha", "")[:10]
         for p in fecha.get("partidos", []):
+            match_hour = p.get("hora", "")
+            if match_hour:
+                match_datetime = f"{raw_date}T{match_hour}:00"
+            else:
+                match_datetime = raw_date
             eq1 = p.get("equipo1", {})
             eq2 = p.get("equipo2", {})
             if eq1.get("_id") == torneo_api.EQUIPO_ID:
@@ -121,12 +126,12 @@ def sync_matches() -> dict:
                 continue
 
             match_data = {
-                "match_date": match_date,
+                "match_date": match_datetime,
                 "opponent": opponent,
                 "field": p.get("cancha", {}).get("nombre"),
             }
 
-            existing = supabase.table("matches").select("id").eq("match_date", match_date).eq("opponent", opponent).execute()
+            existing = supabase.table("matches").select("id").eq("match_date", match_datetime).eq("opponent", opponent).execute()
 
             if existing.data:
                 supabase.table("matches").update(match_data).eq("id", existing.data[0]["id"]).execute()
