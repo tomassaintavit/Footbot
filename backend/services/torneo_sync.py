@@ -119,6 +119,7 @@ def sync_matches() -> dict:
 
             match_data = {
                 "match_date": match_date,
+                "match_time": p.get("hora", ""),
                 "opponent": opponent,
                 "field": p.get("cancha", {}).get("nombre"),
             }

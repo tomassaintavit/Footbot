@@ -15,11 +15,12 @@ def get_next_matches():
         
         message = "🗓️ <b>Próximos Partidos</b>\n<pre>\n"
         for m in next_matches:
+            raw_date = (m.get("match_date") or "")[:10]
             try:
-                date_obj = datetime.strptime(m["match_date"], "%Y-%m-%d")
+                date_obj = datetime.strptime(raw_date, "%Y-%m-%d")
                 friendly_date = date_obj.strftime("%d/%m (%A)")
             except:
-                friendly_date = m["match_date"]
+                friendly_date = raw_date
 
             opponent = m.get("opponent", "Rival por confirmar")[:22].ljust(22)
             field = (m.get("field") or m.get("location") or "Cancha por confirmar")[:15].ljust(15)
