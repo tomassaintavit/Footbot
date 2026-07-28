@@ -27,3 +27,7 @@ supabase
 
 # Telegram Bot
 python-telegram-bot==21.11.1
+
+# Google Sheets
+gspread==6.2.0
+google-auth==2.38.0

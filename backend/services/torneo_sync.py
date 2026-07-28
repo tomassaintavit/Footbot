@@ -113,13 +113,15 @@ def sync_matches() -> dict:
         for p in fecha.get("partidos", []):
             eq1 = p.get("equipo1", {})
             eq2 = p.get("equipo2", {})
-            opponent = eq2.get("nombre", "") if eq1.get("_id") == torneo_api.EQUIPO_ID else eq1.get("nombre", "")
-            if not opponent:
+            if eq1.get("_id") == torneo_api.EQUIPO_ID:
+                opponent = eq2.get("nombre", "")
+            elif eq2.get("_id") == torneo_api.EQUIPO_ID:
+                opponent = eq1.get("nombre", "")
+            else:
                 continue
 
             match_data = {
                 "match_date": match_date,
-                "match_time": p.get("hora", ""),
                 "opponent": opponent,
                 "field": p.get("cancha", {}).get("nombre"),
             }

@@ -36,6 +36,8 @@ venv/
 .venv/
 backend/.venv/
 
+backend/google-creds.json
+
 # ================================
 # Node / Frontend
 # ================================
@@ -62,3 +64,4 @@ frontend/.env.local
 
 /.agents/skills
 skills-lock.json
+

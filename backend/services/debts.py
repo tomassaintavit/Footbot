@@ -47,7 +47,8 @@ def create_debt_by_player_name(player_name: str, amount: float):
         # 2. Insertar la nueva deuda
         supabase.table("debts").insert({
             "player_id": player["id"],
-            "amount": amount
+            "amount": amount,
+            "is_paid": False
         }).execute()
 
         return {

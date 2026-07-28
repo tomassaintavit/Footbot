@@ -7,7 +7,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import Conflict as TelegramConflict
 
 from database import supabase
-from services import intelligence, debts, players, attendance, matches, positions, logs, torneo_sync
+from services import intelligence, debts, players, attendance, matches, positions, logs, torneo_sync, sheets_sync
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,8 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /actualizar_jugador — Modificar datos\n"
         "• /nueva_deuda — Cargar deuda\n"
         "• /borrar_deuda — Eliminar deudas\n"
-        "• /sincronizar — Sincronizar datos con Torneo Golden\n\n"
+        "• /sincronizar — Sincronizar datos con Torneo Golden\n"
+        "• /sincronizar_deudas — Sincronizar deudas desde Google Sheets\n\n"
         "<b>Vincular jugador</b>\n"
         "• /link Nombre TelegramID — Asocia un jugador a su Telegram\n"
         "  El jugador obtiene su ID de @userinfobot\n\n"
@@ -267,6 +268,21 @@ async def sincronizar_command(update: Update, context: ContextTypes.DEFAULT_TYPE
     except Exception as e:
         logger.exception("Error en sincronización")
         await update.message.reply_text(f"❌ Error al sincronizar: {str(e)}")
+
+
+async def sincronizar_deudas_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if not await _admin_only(update):
+        return
+    await update.message.reply_text("🔄 Sincronizando deudas desde Google Sheets...")
+    try:
+        result = sheets_sync.sync_debts()
+        if result["success"]:
+            await update.message.reply_text(f"✅ {result['message']}")
+        else:
+            await update.message.reply_text(f"❌ {result['message']}")
+    except Exception as e:
+        logger.exception("Error al sincronizar deudas")
+        await update.message.reply_text(f"❌ Error al sincronizar deudas: {str(e)}")
 
 
 # ── Conversation states ──────────────────────────────────────────
@@ -764,6 +780,7 @@ async def start_bot():
     _application.add_handler(CommandHandler("asistencia", asistencia_command))
     _application.add_handler(CommandHandler("posiciones", posiciones_command))
     _application.add_handler(CommandHandler("sincronizar", sincronizar_command))
+    _application.add_handler(CommandHandler("sincronizar_deudas", sincronizar_deudas_command))
     _application.add_handler(conv_handler)
     _application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, unknown_message))
 
