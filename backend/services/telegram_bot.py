@@ -170,6 +170,56 @@ async def link_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 
+async def jugadores_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = str(update.effective_user.id)
+    player = find_or_link_player(telegram_id)
+    if not player:
+        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+        return
+    result = players.get_players_list()["message"]
+    await update.message.reply_text(result)
+
+
+async def deudas_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = str(update.effective_user.id)
+    player = find_or_link_player(telegram_id)
+    if not player:
+        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+        return
+    result = debts.get_debts_list()["message"]
+    await update.message.reply_text(result)
+
+
+async def partidos_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = str(update.effective_user.id)
+    player = find_or_link_player(telegram_id)
+    if not player:
+        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+        return
+    result = matches.get_next_matches()["message"]
+    await update.message.reply_text(result)
+
+
+async def asistencia_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = str(update.effective_user.id)
+    player = find_or_link_player(telegram_id)
+    if not player:
+        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+        return
+    result = attendance.get_match_attendance()["message"]
+    await update.message.reply_text(result)
+
+
+async def posiciones_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    telegram_id = str(update.effective_user.id)
+    player = find_or_link_player(telegram_id)
+    if not player:
+        await update.message.reply_text("Primero vinculá tu cuenta con /link Tu Nombre")
+        return
+    result = positions.get_positions_table()["message"]
+    await update.message.reply_text(result)
+
+
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     telegram_id = str(user.id)
@@ -201,6 +251,11 @@ async def start_bot():
     _application.add_handler(CommandHandler("start", start))
     _application.add_handler(CommandHandler("help", help_command))
     _application.add_handler(CommandHandler("link", link_command))
+    _application.add_handler(CommandHandler("jugadores", jugadores_command))
+    _application.add_handler(CommandHandler("deudas", deudas_command))
+    _application.add_handler(CommandHandler("partidos", partidos_command))
+    _application.add_handler(CommandHandler("asistencia", asistencia_command))
+    _application.add_handler(CommandHandler("posiciones", posiciones_command))
     _application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
     await _application.initialize()
