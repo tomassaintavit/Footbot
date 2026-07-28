@@ -247,11 +247,11 @@ async def posiciones_command(update: Update, context: ContextTypes.DEFAULT_TYPE)
 # ── Conversation states ──────────────────────────────────────────
 (
     NJ_NAME, NJ_NICKNAME, NJ_DNI, NJ_CONFIRMAR,
-    BJ_NAME, BJ_CONFIRMAR,
-    ND_NAME, ND_AMOUNT, ND_CONFIRMAR,
-    BD_NAME, BD_CONFIRMAR,
-    UJ_NAME, UJ_FIELD, UJ_VALUE, UJ_CONFIRMAR,
-) = range(15)
+    BJ_NAME, BJ_SELECT, BJ_CONFIRMAR,
+    ND_NAME, ND_AMOUNT, ND_SELECT, ND_CONFIRMAR,
+    BD_NAME, BD_SELECT, BD_CONFIRMAR,
+    UJ_NAME, UJ_SELECT, UJ_FIELD, UJ_VALUE, UJ_CONFIRMAR,
+) = range(19)
 
 EDITABLE_FIELDS = {
     "1": ("nickname", "Apodo"),
@@ -277,6 +277,42 @@ FIELD_KEYWORDS = {
 def find_player_by_telegram_id(telegram_id: str):
     query = supabase.table("players").select("*").eq("telegram_id", telegram_id).execute()
     return query.data[0] if query.data else None
+
+
+def search_players(name: str):
+    query = supabase.table("players").select("id, name, nickname").ilike("name", f"*{name}*").execute()
+    return query.data or []
+
+
+def format_players_for_selection(players):
+    lines = []
+    for i, p in enumerate(players, 1):
+        nick = f" ({p.get('nickname')})" if p.get("nickname") else ""
+        lines.append(f"{i}. {p['name']}{nick}")
+    return "\n".join(lines)
+
+
+def _resolve_player_selection(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    candidates = context.user_data.get("candidates", [])
+    try:
+        idx = int(text) - 1
+        if 0 <= idx < len(candidates):
+            return candidates[idx]
+    except ValueError:
+        pass
+    return None
+
+
+def _format_uj_fields(player_name: str):
+    msg = (
+        f"<b>Jugador:</b> {player_name}\n\n"
+        f"<b>¿Qué campo querés actualizar?</b>\n\n"
+    )
+    for k, (field, label) in EDITABLE_FIELDS.items():
+        msg += f"{k} → {label}\n"
+    msg += "\nRespondé con el número o nombre del campo:"
+    return msg
 
 
 async def cancelar(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -354,9 +390,32 @@ async def bj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return BJ_NAME
 
 async def bj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["bj_name"] = update.message.text.strip()
+    name = update.message.text.strip()
+    candidates = search_players(name)
+    if not candidates:
+        await update.message.reply_text(f"🔍 No encontré a '{name}'.")
+        return ConversationHandler.END
+    if len(candidates) == 1:
+        context.user_data["selected_player"] = candidates[0]
+        await update.message.reply_text(
+            f"¿Eliminar a <b>{candidates[0]['name']}</b>?\n\n"
+            f"✅ Escribí si para confirmar\n"
+            f"❌ Cualquier otra cosa para cancelar"
+        )
+        return BJ_CONFIRMAR
+    context.user_data["candidates"] = candidates
+    msg = f"Encontré varios jugadores con ese nombre:\n\n{format_players_for_selection(candidates)}\n\nRespondé con el número:"
+    await update.message.reply_text(msg)
+    return BJ_SELECT
+
+async def bj_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected = _resolve_player_selection(update, context)
+    if not selected:
+        await update.message.reply_text("❌ Número inválido. Cancelado.")
+        return ConversationHandler.END
+    context.user_data["selected_player"] = selected
     await update.message.reply_text(
-        f"¿Eliminar a <b>{context.user_data['bj_name']}</b>?\n\n"
+        f"¿Eliminar a <b>{selected['name']}</b>?\n\n"
         f"✅ Escribí si para confirmar\n"
         f"❌ Cualquier otra cosa para cancelar"
     )
@@ -365,11 +424,11 @@ async def bj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bj_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().lower()
     if text in ("si", "sí", "s"):
-        name = context.user_data["bj_name"]
-        result = players.delete_player(name)
+        player = context.user_data["selected_player"]
+        result = players.delete_player(player["name"])
         admin = context.user_data["admin_player"]
         if result.get("success"):
-            logs.create_log(admin["id"], "delete_player", f"Eliminó al jugador {name}")
+            logs.create_log(admin["id"], "delete_player", f"Eliminó al jugador {player['name']}")
         await update.message.reply_text(result["message"])
     else:
         await update.message.reply_text("❌ Cancelado.")
@@ -388,17 +447,37 @@ async def nd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ND_NAME
 
 async def nd_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["nd_name"] = update.message.text.strip()
-    await update.message.reply_text("💰 <b>Monto de la deuda:</b>\n(Ej: 5000)")
+    name = update.message.text.strip()
+    candidates = search_players(name)
+    if not candidates:
+        await update.message.reply_text(f"🔍 No encontré a '{name}'.")
+        return ConversationHandler.END
+    if len(candidates) == 1:
+        context.user_data["selected_player"] = candidates[0]
+        await update.message.reply_text(f"💰 <b>Monto de la deuda:</b>\n(Ej: 5000)")
+        return ND_AMOUNT
+    context.user_data["candidates"] = candidates
+    msg = f"Encontré varios jugadores:\n\n{format_players_for_selection(candidates)}\n\nRespondé con el número:"
+    await update.message.reply_text(msg)
+    return ND_SELECT
+
+async def nd_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected = _resolve_player_selection(update, context)
+    if not selected:
+        await update.message.reply_text("❌ Número inválido. Cancelado.")
+        return ConversationHandler.END
+    context.user_data["selected_player"] = selected
+    await update.message.reply_text(f"💰 <b>Monto de la deuda:</b>\n(Ej: 5000)")
     return ND_AMOUNT
 
 async def nd_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
         amount = float(update.message.text.strip().replace("$", "").replace(",", ""))
         context.user_data["nd_amount"] = amount
+        player = context.user_data["selected_player"]
         await update.message.reply_text(
             f"<b>Resumen:</b>\n"
-            f"👤 Jugador: {context.user_data['nd_name']}\n"
+            f"👤 Jugador: {player['name']}\n"
             f"💰 Monto: ${amount:,.0f}\n\n"
             f"✅ Escribí si para confirmar\n"
             f"❌ Cualquier otra cosa para cancelar"
@@ -411,13 +490,14 @@ async def nd_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def nd_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().lower()
     if text in ("si", "sí", "s"):
+        player = context.user_data["selected_player"]
         result = debts.create_debt_by_player_name(
-            context.user_data["nd_name"], context.user_data["nd_amount"]
+            player["name"], context.user_data["nd_amount"]
         )
         admin = context.user_data["admin_player"]
         if result.get("success"):
             logs.create_log(admin["id"], "add_debt",
-                f"Añadió deuda de ${context.user_data['nd_amount']:,.0f} a {context.user_data['nd_name']}")
+                f"Añadió deuda de ${context.user_data['nd_amount']:,.0f} a {player['name']}")
         await update.message.reply_text(result["message"])
     else:
         await update.message.reply_text("❌ Cancelado.")
@@ -436,9 +516,32 @@ async def bd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return BD_NAME
 
 async def bd_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    context.user_data["bd_name"] = update.message.text.strip()
+    name = update.message.text.strip()
+    candidates = search_players(name)
+    if not candidates:
+        await update.message.reply_text(f"🔍 No encontré a '{name}'.")
+        return ConversationHandler.END
+    if len(candidates) == 1:
+        context.user_data["selected_player"] = candidates[0]
+        await update.message.reply_text(
+            f"¿Borrar todas las deudas de <b>{candidates[0]['name']}</b>?\n\n"
+            f"✅ Escribí si para confirmar\n"
+            f"❌ Cualquier otra cosa para cancelar"
+        )
+        return BD_CONFIRMAR
+    context.user_data["candidates"] = candidates
+    msg = f"Encontré varios jugadores:\n\n{format_players_for_selection(candidates)}\n\nRespondé con el número:"
+    await update.message.reply_text(msg)
+    return BD_SELECT
+
+async def bd_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected = _resolve_player_selection(update, context)
+    if not selected:
+        await update.message.reply_text("❌ Número inválido. Cancelado.")
+        return ConversationHandler.END
+    context.user_data["selected_player"] = selected
     await update.message.reply_text(
-        f"¿Borrar todas las deudas de <b>{context.user_data['bd_name']}</b>?\n\n"
+        f"¿Borrar todas las deudas de <b>{selected['name']}</b>?\n\n"
         f"✅ Escribí si para confirmar\n"
         f"❌ Cualquier otra cosa para cancelar"
     )
@@ -447,11 +550,12 @@ async def bd_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
 async def bd_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip().lower()
     if text in ("si", "sí", "s"):
-        result = debts.delete_debt_by_player_name(context.user_data["bd_name"])
+        player = context.user_data["selected_player"]
+        result = debts.delete_debt_by_player_name(player["name"])
         admin = context.user_data["admin_player"]
         if result.get("success"):
             logs.create_log(admin["id"], "delete_debt",
-                f"Eliminó deudas de {context.user_data['bd_name']}")
+                f"Eliminó deudas de {player['name']}")
         await update.message.reply_text(result["message"])
     else:
         await update.message.reply_text("❌ Cancelado.")
@@ -471,20 +575,36 @@ async def uj_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def uj_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
     name = update.message.text.strip()
-    result = players.get_player(name)
-    if not result.get("data"):
-        await update.message.reply_text(f"❌ No encontré a '{name}'.")
+    candidates = search_players(name)
+    if not candidates:
+        await update.message.reply_text(f"🔍 No encontré a '{name}'.")
         return ConversationHandler.END
-    context.user_data["uj_player"] = result["data"]
-    context.user_data["uj_name"] = name
-    msg = (
-        f"<b>Jugador:</b> {name}\n\n"
-        f"<b>¿Qué campo querés actualizar?</b>\n\n"
-    )
+    if len(candidates) == 1:
+        result = players.get_player(candidates[0]["name"])
+        context.user_data["uj_player"] = result.get("data", candidates[0])
+        context.user_data["uj_name"] = candidates[0]["name"]
+        msg = _format_uj_fields(candidates[0]["name"])
+        await update.message.reply_text(msg)
+        return UJ_FIELD
+    context.user_data["candidates"] = candidates
+    msg = f"Encontré varios jugadores:\n\n{format_players_for_selection(candidates)}\n\nRespondé con el número:"
+    await update.message.reply_text(msg)
+    return UJ_SELECT
     for k, (field, label) in EDITABLE_FIELDS.items():
         msg += f"`{k}` → {label}\n"
     msg += "\nRespondé con el número o nombre del campo:"
     await update.message.reply_text(msg)
+    return UJ_FIELD
+
+async def uj_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected = _resolve_player_selection(update, context)
+    if not selected:
+        await update.message.reply_text("❌ Número inválido. Cancelado.")
+        return ConversationHandler.END
+    result = players.get_player(selected["name"])
+    context.user_data["uj_player"] = result.get("data", selected)
+    context.user_data["uj_name"] = selected["name"]
+    await update.message.reply_text(_format_uj_fields(selected["name"]))
     return UJ_FIELD
 
 async def uj_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -557,13 +677,17 @@ conv_handler = ConversationHandler(
         NJ_DNI: [MessageHandler(filters.TEXT & ~filters.COMMAND, nj_dni)],
         NJ_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, nj_confirmar)],
         BJ_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, bj_name)],
+        BJ_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, bj_select)],
         BJ_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, bj_confirmar)],
         ND_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, nd_name)],
         ND_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, nd_amount)],
+        ND_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, nd_select)],
         ND_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, nd_confirmar)],
         BD_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, bd_name)],
+        BD_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, bd_select)],
         BD_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, bd_confirmar)],
         UJ_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_name)],
+        UJ_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_select)],
         UJ_FIELD: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_field)],
         UJ_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_value)],
         UJ_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_confirmar)],

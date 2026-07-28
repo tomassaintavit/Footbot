@@ -23,8 +23,12 @@ def create_player(name: str):
 
 def delete_player(name: str):
     try:
-        supabase.table("players").delete().eq("name", name).execute()
-        return {"success": True, "message": f"Jugador {name} eliminado exitosamente."}
+        query = supabase.table("players").select("id, name").ilike("name", name).execute()
+        if not query.data:
+            return {"success": False, "message": f"🔍 No encontré a '{name}'."}
+        player = query.data[0]
+        supabase.table("players").delete().eq("id", player["id"]).execute()
+        return {"success": True, "message": f"🗑️ {player['name']} eliminado."}
     except Exception as e:
         return {"success": False, "message": f"Error al eliminar el jugador: {str(e)}"}
     
