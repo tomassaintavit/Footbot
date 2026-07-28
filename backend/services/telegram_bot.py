@@ -258,7 +258,9 @@ async def sincronizar_command(update: Update, context: ContextTypes.DEFAULT_TYPE
                 msg += f", {result['players']['errors']} errores"
             msg += "\n"
         if result["positions"]["success"]:
-            msg += f"📊 <b>Posiciones:</b> {result['positions'].get('message', f'{result[\"positions\"][\"inserted\"]} registros')}\n"
+            pos_inserted = result['positions'].get('inserted', 0)
+            pos_msg = result['positions'].get('message', f"{pos_inserted} registros")
+            msg += f"📊 <b>Posiciones:</b> {pos_msg}\n"
         if result["matches"]["success"]:
             msg += f"⚽ <b>Partidos:</b> {result['matches']['synced']} sincronizados\n"
         await update.message.reply_text(msg)

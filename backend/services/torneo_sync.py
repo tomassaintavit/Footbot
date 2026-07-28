@@ -73,7 +73,7 @@ def sync_positions() -> dict:
         return {"success": False, "error": str(e)}
 
     if not zonas:
-        return {"success": True, "message": "No hay posiciones disponibles (el torneo aún no comenzó)."}
+        return {"success": True, "inserted": 0, "message": "No hay posiciones disponibles (el torneo aún no comenzó)."}
 
     supabase.table("positions").delete().neq("id", 0).execute()
 
