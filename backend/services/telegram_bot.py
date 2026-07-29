@@ -119,15 +119,8 @@ def process_message(player, text: str, model: str = "llama3") -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(
-        f"⚽ ¡Hola {user.first_name}! Soy <b>Footbot</b>, tu asistente del equipo.\n\n"
-        "Escribime con lenguaje natural o usá los comandos:\n\n"
-        "<b>Comandos:</b>\n"
-        "• /jugadores — Lista de jugadores\n"
-        "• /deudas — Deudas pendientes\n"
-        "• /partidos — Próximos partidos\n"
-        "• /asistencia — Confirmados\n"
-        "• /posiciones — Tabla de posiciones\n\n"
-        "<b>Admin:</b> /nuevo_jugador, /borrar_jugador, /actualizar_jugador, /nueva_deuda, /borrar_deuda, /sincronizar"
+        f"⚽ ¡Hola {user.first_name}! Soy <b>Footbot</b>.\n\n"
+        "Usá <b>/help</b> para ver todos los comandos disponibles."
     )
 
 
@@ -146,6 +139,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /actualizar_jugador — Modificar datos\n"
         "• /nueva_deuda — Cargar deuda\n"
         "• /borrar_deuda — Eliminar deudas\n"
+        "• /pagar — Registrar pago de un jugador\n"
         "• /agregar_deuda_mes — Sumar cuota mensual a todos\n"
         "• /sincronizar — Sincronizar datos con Torneo Golden\n"
         "• /sincronizar_deudas — Sincronizar deudas desde Google Sheets\n\n"
@@ -286,6 +280,95 @@ async def sincronizar_deudas_command(update: Update, context: ContextTypes.DEFAU
         await update.message.reply_text(f"❌ Error al sincronizar deudas: {str(e)}")
 
 
+# ── /pagar ───────────────────────────────────────────────────────
+
+async def pg_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    player = find_player_by_telegram_id(str(update.effective_user.id))
+    if not player or not player.get("is_admin"):
+        await update.message.reply_text("⛔ Solo administradores.")
+        return ConversationHandler.END
+    context.user_data["admin_player"] = player
+    await update.message.reply_text("💰 <b>Nombre del jugador que pagó:</b>")
+    return PG_NAME
+
+
+async def pg_name(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    name = update.message.text.strip()
+    candidates = search_players(name)
+    if not candidates:
+        await update.message.reply_text(f"🔍 No encontré a '{name}'.")
+        return ConversationHandler.END
+    if len(candidates) == 1:
+        context.user_data["selected_player"] = candidates[0]
+        monto_msg = f"💰 <b>Monto que pagó {candidates[0]['name']}:</b>\n(Ej: 5000)"
+        await update.message.reply_text(monto_msg)
+        return PG_AMOUNT
+    context.user_data["candidates"] = candidates
+    msg = f"Encontré varios jugadores:\n\n{format_players_for_selection(candidates)}\n\nRespondé con el número:"
+    await update.message.reply_text(msg)
+    return PG_SELECT
+
+
+async def pg_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    selected = _resolve_player_selection(update, context)
+    if not selected:
+        await update.message.reply_text("❌ Número inválido. Cancelado.")
+        return ConversationHandler.END
+    context.user_data["selected_player"] = selected
+    monto_msg = f"💰 <b>Monto que pagó {selected['name']}:</b>\n(Ej: 5000)"
+    await update.message.reply_text(monto_msg)
+    return PG_AMOUNT
+
+
+async def pg_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        amount = float(update.message.text.strip().replace("$", "").replace(",", ""))
+        if amount <= 0:
+            await update.message.reply_text("❌ El monto debe ser mayor a cero.")
+            return PG_AMOUNT
+        context.user_data["pg_amount"] = amount
+        player = context.user_data["selected_player"]
+        await update.message.reply_text(
+            f"<b>Resumen:</b>\n"
+            f"👤 Jugador: {player['name']}\n"
+            f"💰 Pagó: ${amount:,.0f}\n\n"
+            f"✅ Escribí <b>si</b> para confirmar\n"
+            f"❌ Cualquier otra cosa para cancelar"
+        )
+        return PG_CONFIRM
+    except ValueError:
+        await update.message.reply_text("❌ Monto inválido. Usá solo números.\nEj: 5000")
+        return PG_AMOUNT
+
+
+async def pg_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip().lower()
+    if text in ("si", "sí", "s"):
+        player = context.user_data["selected_player"]
+        amount = context.user_data["pg_amount"]
+        if not player.get("dni"):
+            await update.message.reply_text(f"❌ {player['name']} no tiene DNI registrado. No se puede actualizar.")
+            return ConversationHandler.END
+        result = sheets_sync.reduce_debt(player["dni"], amount)
+        admin = context.user_data["admin_player"]
+        if result.get("success"):
+            logs.create_log(admin["id"], "payment",
+                f"Registró pago de ${amount:,.0f} de {result['player_name']} "
+                f"(deuda anterior: ${result['previous_debt']:,.0f})")
+            await update.message.reply_text(
+                f"✅ <b>Pago registrado</b>\n"
+                f"👤 {result['player_name']}\n"
+                f"💰 Pagó: ${amount:,.0f}\n"
+                f"📉 Deuda anterior: ${result['previous_debt']:,.0f}\n"
+                f"📊 Deuda actual: <b>${result['new_debt']:,.0f}</b>"
+            )
+        else:
+            await update.message.reply_text(f"❌ {result.get('error', 'Error desconocido')}")
+    else:
+        await update.message.reply_text("❌ Cancelado.")
+    return ConversationHandler.END
+
+
 # ── Conversation states ──────────────────────────────────────────
 (
     NJ_NAME, NJ_NICKNAME, NJ_DNI, NJ_CONFIRMAR,
@@ -294,7 +377,8 @@ async def sincronizar_deudas_command(update: Update, context: ContextTypes.DEFAU
     BD_NAME, BD_SELECT, BD_CONFIRMAR,
     UJ_NAME, UJ_SELECT, UJ_FIELD, UJ_VALUE, UJ_CONFIRMAR,
     MF_AMOUNT, MF_CONFIRM,
-) = range(21)
+    PG_NAME, PG_SELECT, PG_AMOUNT, PG_CONFIRM,
+) = range(25)
 
 EDITABLE_FIELDS = {
     "1": ("nickname", "Apodo"),
@@ -323,7 +407,7 @@ def find_player_by_telegram_id(telegram_id: str):
 
 
 def search_players(name: str):
-    query = supabase.table("players").select("id, name, nickname").ilike("name", f"*{name}*").execute()
+    query = supabase.table("players").select("id, name, nickname, dni").ilike("name", f"*{name}*").execute()
     return query.data or []
 
 
@@ -765,6 +849,7 @@ conv_handler = ConversationHandler(
         CommandHandler("borrar_deuda", bd_start),
         CommandHandler("actualizar_jugador", uj_start),
         CommandHandler("agregar_deuda_mes", mf_start),
+        CommandHandler("pagar", pg_start),
     ],
     states={
         NJ_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, nj_name)],
@@ -788,6 +873,10 @@ conv_handler = ConversationHandler(
         UJ_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_confirmar)],
         MF_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, mf_amount)],
         MF_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, mf_confirm)],
+        PG_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_name)],
+        PG_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_select)],
+        PG_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_amount)],
+        PG_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_confirm)],
     },
     fallbacks=[CommandHandler("cancelar", cancelar)],
     name="admin_conversations",
