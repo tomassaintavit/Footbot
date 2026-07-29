@@ -1,76 +1,91 @@
 # Diagrama de Base de Datos (Supabase)
 
-A continuación, puedes visualizar la estructura de la base de datos que vamos a crear en Supabase, junto con el propósito de cada tabla y la relación entre ellas.
-
-## Entity-Relationship Diagram (ERD)
-
 **Relaciones principales:**
 - **PLAYERS** *asiste a* **ATTENDANCE**
 - **MATCHES** *recibe* **ATTENDANCE**
-- **PLAYERS** *adeuda* **DEBTS**
+- **PLAYERS** *tiene* **TRANSACTIONS** (cargos y pagos)
+- **PLAYERS** *registra* **LOGS** (bitácora de acciones admin)
 
 ### Tablas
 
 #### PLAYERS
-| Columna | Tipo de dato | Propósito |
+| Columna | Tipo | Propósito |
 | :--- | :--- | :--- |
-| `id` | uuid (**PK**) | Generado por defecto |
-| `name` | string | Nombre completo |
-| `nickname` | string | Apodo/Alias para reconocimiento de mensajes |
-| `dni` | string | Documento único para sincronización |
-| `email` | string | Correo electrónico |
+| `id` | **bigint (PK)** | Generado por defecto |
+| `name` | text | Nombre completo |
+| `nickname` | text | Apodo |
+| `dni` | text | Documento para vincular con Google Sheet |
+| `email` | text | Correo electrónico |
 | `goals` | integer | Goles totales en el torneo |
 | `yellow_cards` | integer | Tarjetas amarillas acumuladas |
 | `red_cards` | integer | Tarjetas rojas acumuladas |
-| `is_suspended` | boolean | Si el jugador está sancionado actualmente |
-| `suspension_reason` | string | Motivo de la sanción |
-| `created_at` | timestamp | Fecha de registro |
-| `auth_id` | uuid | **TODO: Añadir en Supabase.** Link con el `user_id` de Auth |
-| `is_admin` | boolean | **TODO: Añadir en Supabase.** Permisos de administrador |
+| `is_suspended` | boolean | Si está sancionado |
+| `suspension_reason` | text | Motivo de la sanción |
+| `telegram_id` | text | ID de Telegram para comandos del bot |
+| `auth_id` | uuid | ID de Supabase Auth para login web |
+| `is_admin` | boolean | Permisos de administrador |
+| `created_at` | timestamptz | Fecha de registro |
 
 #### MATCHES
-| Columna | Tipo de dato | Propósito |
+| Columna | Tipo | Propósito |
 | :--- | :--- | :--- |
-| `id` | uuid (**PK**) | Generado por defecto |
-| `match_date` | datetime | Fecha y hora del partido |
-| `opponent` | string | Nombre del equipo rival |
-| `field` | string | Cancha/Predio donde se juega |
-| `category` | string | Categoría del torneo (Ej: Silver) |
-| `created_at` | timestamp | Fecha de creación |
+| `id` | **bigint (PK)** | Generado por defecto |
+| `match_date` | timestamptz | Fecha y hora del partido |
+| `opponent` | text | Equipo rival |
+| `field` | text | Cancha |
+| `category` | text | Categoría del torneo (Silver) |
+| `created_at` | timestamptz | Fecha de creación |
 
 #### ATTENDANCE
-| Columna | Tipo de dato | Propósito |
+| Columna | Tipo | Propósito |
 | :--- | :--- | :--- |
-| `id` | uuid (**PK**) | Generado por defecto |
-| `match_id` | uuid (**FK**) | Relación con MATCHES |
-| `player_id` | uuid (**FK**) | Relación con PLAYERS |
-| `status` | string | Ej: confirmado, baja, duda |
-| `created_at` | timestamp | Fecha de confirmación |
+| `id` | **bigint (PK)** | Generado por defecto |
+| `match_id` | **bigint (FK → matches)** | Partido |
+| `player_id` | **bigint (FK → players)** | Jugador |
+| `status` | text | confirmado, baja, duda |
+| `created_at` | timestamptz | Fecha de confirmación |
 
-#### DEBTS
-| Columna | Tipo de dato | Propósito |
+#### TRANSACTIONS (ledger contable)
+| Columna | Tipo | Propósito |
 | :--- | :--- | :--- |
-| `id` | uuid (**PK**) | Generado por defecto |
-| `player_id` | uuid (**FK**) | Relación con PLAYERS |
-| `amount` | numeric | Monto de la deuda (Ej: 1500) |
-| `is_paid` | boolean | Por defecto 'false' |
-| `created_at` | timestamp | Fecha de registro de la deuda |
+| `id` | **uuid (PK)** | Generado por defecto |
+| `player_id` | **bigint (FK → players)** | Jugador |
+| `amount` | numeric | **Positivo** = cargo (cuota, deuda). **Negativo** = pago |
+| `description` | text | "Cuota mensual", "Pago", "Ajuste por conciliación", etc. |
+| `year` | integer | Año (para agrupar históricamente) |
+| `month` | integer | Mes |
+| `created_at` | timestamptz | Fecha del movimiento |
 
-#### AUDIT_LOGS
-| Columna | Tipo de dato | Propósito |
+> El saldo actual de un jugador se calcula como `SUM(amount)`. Si da positivo, debe; si da negativo o cero, está al día.
+
+#### LOGS
+| Columna | Tipo | Propósito |
 | :--- | :--- | :--- |
-| `id` | uuid (**PK**) | Generado por defecto |
-| `player_id` | uuid (**FK**) | Admin que realizó la acción |
-| `action` | string | Nombre de la acción (ej: add_debt) |
-| `details` | string | Detalles legibles de la operación |
-| `created_at` | timestamp | Fecha y hora del registro |
+| `id` | **bigint (PK)** | Generado por defecto |
+| `player_id` | **bigint (FK → players)** | Admin que realizó la acción |
+| `action` | text | Nombre de la acción (add_debt, payment, etc.) |
+| `details` | text | Descripción legible de la operación |
+| `created_at` | timestamptz | Fecha del registro |
 
+#### POSITIONS
+| Columna | Tipo | Propósito |
+| :--- | :--- | :--- |
+| `id` | **bigint (PK)** | Generado por defecto |
+| `position` | integer | Puesto en la tabla |
+| `team` | text | Nombre del equipo |
+| `played` | integer | Partidos jugados |
+| `won` | integer | Ganados |
+| `drawn` | integer | Empatados |
+| `lost` | integer | Perdidos |
+| `goals_for` | integer | Goles a favor |
+| `goals_against` | integer | Goles en contra |
+| `points` | integer | Puntos |
+| `created_at` | timestamptz | Fecha de sincronización |
 
-## Explicación de las Relaciones
+## Relaciones
 
-- `players` y `matches` son las tablas principales. Existen de forma independiente.
-- `attendance` es una tabla intermedia (*Many-to-Many*). Un jugador (`player_id`) puede asistir a muchos partidos, y un partido (`match_id`) tiene muchos asistentes.
-- `debts` es una relación de Uno a Muchos (*One-to-Many*). Un solo jugador (`player_id`) puede deber por diferentes razones (una deuda por la cancha, otra por las bebidas del tercer tiempo), pero cada deuda pertenece siempre a un único jugador.
-
-> [!TIP]
-> **En Supabase:** Al crear las columnas `match_id` y `player_id` en la sección "Table Editor", busca el botón que parece un "clip o eslabón de cadena" (Foreign Key). Esto te permitirá enlazar visualmente esas columnas con la columna `id` de las tablas correspondientes, obligando a que no haya asistencias de jugadores que no existen.
+- `players` y `matches` son tablas principales independientes.
+- `attendance` es **Muchos a Muchos** entre players y matches.
+- `transactions` es **Uno a Muchos**: un jugador tiene muchos movimientos financieros.
+- `logs` es **Uno a Muchos**: un admin genera muchos registros de auditoría.
+- `positions` es independiente (datos del torneo, se reemplaza en cada sincronización).
