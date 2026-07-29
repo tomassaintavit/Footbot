@@ -119,7 +119,7 @@ def process_message(player, text: str, model: str = "llama3") -> str:
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     await update.message.reply_text(
-        f"⚽ ¡Hola {user.first_name}! Soy <b>Footbot</b>.\n\n"
+        f"⚽ ¡Hola {user.first_name}! Soy <b>Footbot</b>, el asistente de <b>Buen Palo FC</b>.\n\n"
         "Usá <b>/help</b> para ver todos los comandos disponibles."
     )
 
