@@ -140,6 +140,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /nueva_deuda — Cargar deuda\n"
         "• /borrar_deuda — Eliminar deudas\n"
         "• /pagar — Registrar pago de un jugador\n"
+        "• /pagar_lote MONTO — Pagos múltiples por selección\n"
         "• /agregar_deuda_mes — Sumar cuota mensual a todos\n"
         "• /sincronizar — Sincronizar datos con Torneo Golden\n"
         "• /sincronizar_deudas — Sincronizar deudas desde Google Sheets\n\n"
@@ -369,6 +370,161 @@ async def pg_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+# ── Helpers ──────────────────────────────────────────────────────
+
+def _parse_selection(text: str, max_num: int) -> set[int]:
+    parts = text.replace(" ", ",").split(",")
+    selected = set()
+    for part in parts:
+        part = part.strip()
+        if not part:
+            continue
+        if "-" in part:
+            try:
+                a, b = part.split("-", 1)
+                for i in range(int(a), int(b) + 1):
+                    if 1 <= i <= max_num:
+                        selected.add(i)
+            except ValueError:
+                pass
+        else:
+            try:
+                i = int(part)
+                if 1 <= i <= max_num:
+                    selected.add(i)
+            except ValueError:
+                pass
+    return selected
+
+
+def _last_name(name: str) -> str:
+    parts = name.split()
+    return parts[-1] if parts else name
+
+
+def _reduce_debt_direct(player_id: str, amount: float) -> dict:
+    current = supabase.table("debts").select("amount").eq("player_id", player_id).eq("is_paid", False).execute()
+    total_debt = sum(d["amount"] for d in current.data)
+    new_debt = max(0, total_debt - amount)
+    supabase.table("debts").delete().eq("player_id", player_id).execute()
+    if new_debt > 0:
+        supabase.table("debts").insert({"player_id": player_id, "amount": new_debt, "is_paid": False}).execute()
+    return {"success": True, "previous_debt": total_debt, "new_debt": new_debt}
+
+
+def _format_player_grid(players: list[dict]) -> str:
+    half = (len(players) + 1) // 2
+    lines = []
+    for i in range(half):
+        p1 = players[i]
+        left = f"{i+1}. {_last_name(p1['name'])}"
+        if i + half < len(players):
+            p2 = players[i + half]
+            right = f"{i+half+1}. {_last_name(p2['name'])}"
+            lines.append(f"{left:<24}{right}")
+        else:
+            lines.append(left)
+    return "<pre>" + "\n".join(lines) + "</pre>"
+
+
+# ── /pagar_lote ──────────────────────────────────────────────────
+
+async def pl_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    player = find_player_by_telegram_id(str(update.effective_user.id))
+    if not player or not player.get("is_admin"):
+        await update.message.reply_text("⛔ Solo administradores.")
+        return ConversationHandler.END
+    context.user_data["admin_player"] = player
+
+    args = context.args or []
+    if not args:
+        await update.message.reply_text("Usá: <code>/pagar_lote MONTO</code>\nEj: <code>/pagar_lote 5000</code>")
+        return ConversationHandler.END
+    try:
+        amount = float(args[0].replace("$", "").replace(",", ""))
+        if amount <= 0:
+            await update.message.reply_text("❌ El monto debe ser mayor a cero.")
+            return ConversationHandler.END
+    except ValueError:
+        await update.message.reply_text("❌ Monto inválido.\nEj: <code>/pagar_lote 5000</code>")
+        return ConversationHandler.END
+
+    players = supabase.table("players").select("id, name, nickname, dni").order("name").execute()
+    all_players = players.data or []
+    if not all_players:
+        await update.message.reply_text("No hay jugadores registrados.")
+        return ConversationHandler.END
+
+    context.user_data["pl_amount"] = amount
+    context.user_data["pl_players"] = all_players
+
+    grid = _format_player_grid(all_players)
+    await update.message.reply_text(
+        f"💰 <b>Pago lote — ${amount:,.0f} c/u</b>\n"
+        f"Seleccioná los números (ej: 1,3,5 o 1-3,6):\n\n{grid}"
+    )
+    return PL_SELECT
+
+
+async def pl_select(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip()
+    all_players = context.user_data.get("pl_players", [])
+    indices = _parse_selection(text, len(all_players))
+    if not indices:
+        await update.message.reply_text("❌ Selección inválida. Probá con números como 1,3,5 o 1-3,6")
+        return PL_SELECT
+
+    selected = [all_players[i - 1] for i in sorted(indices)]
+    context.user_data["pl_selected"] = selected
+    amount = context.user_data["pl_amount"]
+
+    names = "\n".join(f"• {p['name']}" for p in selected)
+    await update.message.reply_text(
+        f"📋 <b>Resumen</b>\n"
+        f"💰 ${amount:,.0f} c/u — <b>{len(selected)} jugadores</b>\n"
+        f"💵 Total: ${amount * len(selected):,.0f}\n\n"
+        f"{names}\n\n"
+        f"✅ Escribí <b>si</b> para confirmar\n"
+        f"❌ Cualquier otra cosa para cancelar"
+    )
+    return PL_CONFIRM
+
+
+async def pl_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip().lower()
+    if text not in ("si", "sí", "s"):
+        await update.message.reply_text("❌ Cancelado.")
+        return ConversationHandler.END
+
+    selected = context.user_data.get("pl_selected", [])
+    amount = context.user_data["pl_amount"]
+    admin = context.user_data["admin_player"]
+    ok = []
+    failed = []
+    for p in selected:
+        if p.get("dni"):
+            result = sheets_sync.reduce_debt(p["dni"], amount)
+        else:
+            result = _reduce_debt_direct(p["id"], amount)
+        if result.get("success"):
+            ok.append(f"✅ {_last_name(p['name'])} — ${result['previous_debt']:,.0f} → ${result['new_debt']:,.0f}")
+            logs.create_log(admin["id"], "payment",
+                f"Pago lote: ${amount:,.0f} de {p['name']} (deuda anterior: ${result['previous_debt']:,.0f})")
+        else:
+            failed.append(f"❌ {_last_name(p['name'])} — {result.get('error', 'error')}")
+
+    msg_parts = [f"✅ <b>{len(ok)} pagos registrados</b> — ${amount * len(ok):,.0f}"]
+    if ok:
+        msg_parts.append("")
+        msg_parts.extend(ok)
+    if failed:
+        msg_parts.append("")
+        msg_parts.append(f"⚠️ <b>{len(failed)} errores</b>")
+        msg_parts.extend(failed)
+    await update.message.reply_text("\n".join(msg_parts))
+    return ConversationHandler.END
+
+
 # ── Conversation states ──────────────────────────────────────────
 (
     NJ_NAME, NJ_NICKNAME, NJ_DNI, NJ_CONFIRMAR,
@@ -378,7 +534,8 @@ async def pg_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     UJ_NAME, UJ_SELECT, UJ_FIELD, UJ_VALUE, UJ_CONFIRMAR,
     MF_AMOUNT, MF_CONFIRM,
     PG_NAME, PG_SELECT, PG_AMOUNT, PG_CONFIRM,
-) = range(25)
+    PL_SELECT, PL_CONFIRM,
+) = range(27)
 
 EDITABLE_FIELDS = {
     "1": ("nickname", "Apodo"),
@@ -850,6 +1007,7 @@ conv_handler = ConversationHandler(
         CommandHandler("actualizar_jugador", uj_start),
         CommandHandler("agregar_deuda_mes", mf_start),
         CommandHandler("pagar", pg_start),
+        CommandHandler("pagar_lote", pl_start),
     ],
     states={
         NJ_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, nj_name)],
@@ -877,6 +1035,8 @@ conv_handler = ConversationHandler(
         PG_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_select)],
         PG_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_amount)],
         PG_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, pg_confirm)],
+        PL_SELECT: [MessageHandler(filters.TEXT & ~filters.COMMAND, pl_select)],
+        PL_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, pl_confirm)],
     },
     fallbacks=[CommandHandler("cancelar", cancelar)],
     name="admin_conversations",
