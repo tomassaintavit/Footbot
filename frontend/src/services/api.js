@@ -37,6 +37,10 @@ async function authFetch(url, token) {
   return res.json();
 }
 
+export async function getMe(token) {
+  return authFetch(`${API_URL}/api/admin/me`, token);
+}
+
 export async function getDebts(token) {
   return authFetch(`${API_URL}/api/admin/debts`, token);
 }
