@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import Conflict as TelegramConflict
 
 from database import supabase
-from services import debts, players, attendance, matches, positions, logs, torneo_sync, sheets_sync
+from services import debts, players, attendance, matches, positions, logs, torneo_sync, sheets_sync, scheduler
 
 logger = logging.getLogger(__name__)
 
@@ -997,6 +997,7 @@ async def start_bot():
             else:
                 logger.error("No se pudo iniciar el bot después de 3 intentos.")
                 raise
+    scheduler.start_scheduler(_application.bot)
     logger.info("Bot de Telegram iniciado en modo polling")
 
 
@@ -1004,6 +1005,7 @@ async def stop_bot():
     global _application
     if _application:
         logger.info("Deteniendo bot de Telegram...")
+        scheduler.stop_scheduler()
         await _application.updater.stop()
         await _application.stop()
         await _application.shutdown()

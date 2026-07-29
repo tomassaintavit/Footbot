@@ -28,6 +28,9 @@ supabase
 # Telegram Bot
 python-telegram-bot==21.11.1
 
+# Scheduler
+apscheduler==3.11.0
+
 # Google Sheets
 gspread==6.2.0
 google-auth==2.38.0
