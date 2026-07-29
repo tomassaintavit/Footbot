@@ -1,14 +1,5 @@
 from pydantic import BaseModel
-from typing import Optional, List
-
-class ChatRequest(BaseModel):
-    prompt: str
-    model: str = "llama3"
-    auth_id: str
-    # Lista de mensajes anteriores para dar contexto al LLM
-    # Cada item es: { "role": "user" | "bot", "text": "..." }
-    history: List[dict] = []
-
+from typing import Optional
 
 class AttendanceRequest(BaseModel):
     text: str

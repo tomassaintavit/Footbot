@@ -8,7 +8,7 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 from telegram.error import Conflict as TelegramConflict
 
 from database import supabase
-from services import intelligence, debts, players, attendance, matches, positions, logs, torneo_sync, sheets_sync
+from services import debts, players, attendance, matches, positions, logs, torneo_sync, sheets_sync
 
 logger = logging.getLogger(__name__)
 
@@ -20,101 +20,6 @@ _application: Application | None = None
 def find_player_by_telegram_id(telegram_id: str):
     query = supabase.table("players").select("*").eq("telegram_id", telegram_id).execute()
     return query.data[0] if query.data else None
-
-
-def process_message(player, text: str, model: str = "llama3") -> str:
-    intent = intelligence.extract_intent(text, model)
-    action = intent.get("action")
-    params = intent.get("params", {})
-    response_text = intent.get("response", "Lo siento, no pude procesar eso.")
-
-    critical_actions = ["delete_debt", "update_debt", "add_debt", "add_player", "delete_player", "update_player"]
-    if action in critical_actions and not player.get("is_admin"):
-        return "⛔ No tienes permisos de administrador para realizar esta acción."
-
-    if action == "delete_debt":
-        result = debts.delete_debt_by_player_name(params.get("player_name"))
-        if result.get("success"):
-            logs.create_log(player["id"], "delete_debt", f"Eliminó deudas de {params.get('player_name')}")
-        return result["message"]
-
-    elif action == "get_help":
-        return (
-            "🤖 <b>¡Soy Footbot! Aquí tienes lo que puedo hacer por el equipo:</b>\n\n"
-            "⚽ <b>Partidos</b>\n"
-            "• ¿Cuándo jugamos? → Próximo partido\n"
-            "• Tabla de posiciones → Cómo vamos en el torneo\n\n"
-            "📝 <b>Asistencia</b>\n"
-            "• ¿Quiénes van? → Confirmados para el próximo partido\n"
-            "• Subir lista → Pega la lista de WhatsApp y la proceso\n\n"
-            "💸 <b>Deudas</b>\n"
-            "• ¿Quién debe plata? → Deudores y montos\n\n"
-            "👤 <b>Jugadores</b>\n"
-            "• Ver lista → Todos los registrados\n"
-            "• Información de [Nombre] → Goles, tarjetas, suspensión\n\n"
-            "¡Pregúntame lo que necesites!"
-        )
-
-    elif action == "get_debts_list":
-        return debts.get_debts_list()["message"]
-
-    elif action in ["add_debt", "update_debt"]:
-        amount = params.get("amount", 0)
-        result = debts.create_debt_by_player_name(params.get("player_name"), amount)
-        if result.get("success"):
-            logs.create_log(player["id"], action, f"Añadió/Actualizó deuda de ${amount} a {params.get('player_name')}")
-        return result["message"]
-
-    elif action == "add_player":
-        name = params.get("player_name")
-        result = players.create_player(name)
-        if result.get("success"):
-            logs.create_log(player["id"], "add_player", f"Creó al jugador {name}")
-        return result["message"]
-
-    elif action == "delete_player":
-        name = params.get("player_name")
-        result = players.delete_player(name)
-        if result.get("success"):
-            logs.create_log(player["id"], "delete_player", f"Eliminó al jugador {name}")
-        return result["message"]
-
-    elif action == "update_player":
-        name = params.get("player_name")
-        result = players.update_player(
-            name=name,
-            nickname=params.get("nickname"),
-            dni=params.get("dni"),
-            email=params.get("email"),
-            goals=params.get("goals"),
-            yellow_cards=params.get("yellow_cards"),
-            red_cards=params.get("red_cards"),
-            is_suspended=params.get("is_suspended"),
-        )
-        if result.get("success"):
-            logs.create_log(player["id"], "update_player", f"Actualizó datos de {name}")
-        return result["message"]
-
-    elif action == "get_player":
-        name = params.get("player_name")
-        return players.get_player(name)["message"]
-
-    elif action == "upload_attendance":
-        return attendance.process_attendance_list(text, model)["message"]
-
-    elif action == "get_players_list":
-        return players.get_players_list()["message"]
-
-    elif action == "get_next_matches":
-        return matches.get_next_matches()["message"]
-
-    elif action == "get_attendance_list":
-        return attendance.get_match_attendance()["message"]
-
-    elif action == "get_positions_table":
-        return positions.get_positions_table()["message"]
-
-    return response_text
 
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -1054,24 +959,6 @@ async def unknown_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "Usá `/start` para ver los comandos disponibles."
     )
-
-
-async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user = update.effective_user
-    telegram_id = str(user.id)
-    text = update.message.text.strip()
-
-    player = find_player_by_telegram_id(telegram_id)
-    if not player:
-        await update.message.reply_text(
-            "No estás registrado en Footbot.\n"
-            "Pedile al administrador que te vincule."
-        )
-        return
-
-    logger.info(f"Mensaje de {player['name']} (TG:{telegram_id}): {text}")
-    response = process_message(player, text)
-    await update.message.reply_text(response)
 
 
 async def start_bot():
