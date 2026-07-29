@@ -120,6 +120,68 @@ def add_monthly_fee(amount: float) -> dict:
     return {"success": True, "updated": updated, "sync": sync_result}
 
 
+def set_player_debt(dni: str, amount: float) -> dict:
+    sheet = _get_sheet()
+    all_rows = sheet.get_all_values()
+    if not all_rows:
+        return {"success": False, "error": "Sheet vacío"}
+
+    header = all_rows[0]
+    cols = _find_column_indices(header)
+
+    for i in range(1, len(all_rows)):
+        row = all_rows[i]
+        if row[cols["dni"]].strip() != dni:
+            continue
+
+        formatted = _format_amount(max(0, amount))
+        sheet.update_cell(i + 1, cols["deuda"] + 1, formatted)
+        player_name = row[cols["nombre"]].strip()
+        sync_debts()
+        return {
+            "success": True,
+            "player_name": player_name,
+            "new_debt": max(0, amount),
+        }
+
+    return {"success": False, "error": f"DNI {dni} no encontrado en el sheet"}
+
+
+def add_to_player_debt(dni: str, amount: float) -> dict:
+    sheet = _get_sheet()
+    all_rows = sheet.get_all_values()
+    if not all_rows:
+        return {"success": False, "error": "Sheet vacío"}
+
+    header = all_rows[0]
+    cols = _find_column_indices(header)
+
+    for i in range(1, len(all_rows)):
+        row = all_rows[i]
+        if row[cols["dni"]].strip() != dni:
+            continue
+
+        raw = row[cols["deuda"]].strip().replace("$", "").replace(",", "")
+        try:
+            current = float(raw) if raw else 0
+        except ValueError:
+            current = 0
+
+        new_value = current + amount
+        formatted = _format_amount(new_value)
+        sheet.update_cell(i + 1, cols["deuda"] + 1, formatted)
+        player_name = row[cols["nombre"]].strip()
+        sync_debts()
+        return {
+            "success": True,
+            "player_name": player_name,
+            "previous_debt": current,
+            "new_debt": new_value,
+        }
+
+    return {"success": False, "error": f"DNI {dni} no encontrado en el sheet"}
+
+
 def reduce_debt(dni: str, payment: float) -> dict:
     sheet = _get_sheet()
     all_rows = sheet.get_all_values()

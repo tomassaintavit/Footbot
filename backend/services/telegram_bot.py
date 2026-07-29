@@ -146,6 +146,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
         "• /actualizar_jugador — Modificar datos\n"
         "• /nueva_deuda — Cargar deuda\n"
         "• /borrar_deuda — Eliminar deudas\n"
+        "• /agregar_deuda_mes — Sumar cuota mensual a todos\n"
         "• /sincronizar — Sincronizar datos con Torneo Golden\n"
         "• /sincronizar_deudas — Sincronizar deudas desde Google Sheets\n\n"
         "<b>Vincular jugador</b>\n"
@@ -292,7 +293,8 @@ async def sincronizar_deudas_command(update: Update, context: ContextTypes.DEFAU
     ND_NAME, ND_AMOUNT, ND_SELECT, ND_CONFIRMAR,
     BD_NAME, BD_SELECT, BD_CONFIRMAR,
     UJ_NAME, UJ_SELECT, UJ_FIELD, UJ_VALUE, UJ_CONFIRMAR,
-) = range(19)
+    MF_AMOUNT, MF_CONFIRM,
+) = range(21)
 
 EDITABLE_FIELDS = {
     "1": ("nickname", "Apodo"),
@@ -702,6 +704,57 @@ async def uj_confirmar(update: Update, context: ContextTypes.DEFAULT_TYPE):
     return ConversationHandler.END
 
 
+# ── /agregar_deuda_mes ───────────────────────────────────────────
+
+async def mf_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    player = find_player_by_telegram_id(str(update.effective_user.id))
+    if not player or not player.get("is_admin"):
+        await update.message.reply_text("⛔ Solo administradores.")
+        return ConversationHandler.END
+    context.user_data["admin_player"] = player
+    await update.message.reply_text("💰 <b>¿Cuál es el monto por jugador?</b>\n(Ej: 5000)")
+    return MF_AMOUNT
+
+
+async def mf_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    try:
+        amount = float(update.message.text.strip().replace("$", "").replace(",", ""))
+        if amount <= 0:
+            await update.message.reply_text("❌ El monto debe ser mayor a cero.")
+            return MF_AMOUNT
+        context.user_data["mf_amount"] = amount
+        await update.message.reply_text(
+            f"📋 <b>Resumen:</b>\n"
+            f"💰 Vas a sumar <b>${amount:,.0f}</b> a cada jugador.\n\n"
+            f"✅ Escribí <b>si</b> para confirmar\n"
+            f"❌ Cualquier otra cosa para cancelar"
+        )
+        return MF_CONFIRM
+    except ValueError:
+        await update.message.reply_text("❌ Monto inválido. Usá solo números.\nEj: 5000")
+        return MF_AMOUNT
+
+
+async def mf_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text.strip().lower()
+    if text in ("si", "sí", "s"):
+        amount = context.user_data["mf_amount"]
+        result = sheets_sync.add_monthly_fee(amount)
+        admin = context.user_data["admin_player"]
+        if result.get("success"):
+            logs.create_log(admin["id"], "add_monthly_fee",
+                f"Agregó cuota mensual de ${amount:,.0f} a {result['updated']} jugadores")
+            await update.message.reply_text(
+                f"✅ Cuota mensual de <b>${amount:,.0f}</b> agregada a "
+                f"<b>{result['updated']}</b> jugadores."
+            )
+        else:
+            await update.message.reply_text(f"❌ Error: {result.get('error', 'desconocido')}")
+    else:
+        await update.message.reply_text("❌ Cancelado.")
+    return ConversationHandler.END
+
+
 # ── ConversationHandler ──────────────────────────────────────────
 
 conv_handler = ConversationHandler(
@@ -711,6 +764,7 @@ conv_handler = ConversationHandler(
         CommandHandler("nueva_deuda", nd_start),
         CommandHandler("borrar_deuda", bd_start),
         CommandHandler("actualizar_jugador", uj_start),
+        CommandHandler("agregar_deuda_mes", mf_start),
     ],
     states={
         NJ_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, nj_name)],
@@ -732,6 +786,8 @@ conv_handler = ConversationHandler(
         UJ_FIELD: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_field)],
         UJ_VALUE: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_value)],
         UJ_CONFIRMAR: [MessageHandler(filters.TEXT & ~filters.COMMAND, uj_confirmar)],
+        MF_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, mf_amount)],
+        MF_CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, mf_confirm)],
     },
     fallbacks=[CommandHandler("cancelar", cancelar)],
     name="admin_conversations",
