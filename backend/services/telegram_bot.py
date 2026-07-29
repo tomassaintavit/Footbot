@@ -1,6 +1,7 @@
 import os
 import asyncio
 import logging
+from datetime import datetime
 from telegram import Update
 from telegram.constants import ParseMode
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, ContextTypes, ConversationHandler, Defaults
@@ -403,13 +404,18 @@ def _last_name(name: str) -> str:
 
 
 def _reduce_debt_direct(player_id: str, amount: float) -> dict:
-    current = supabase.table("debts").select("amount").eq("player_id", player_id).eq("is_paid", False).execute()
-    total_debt = sum(d["amount"] for d in current.data)
-    new_debt = max(0, total_debt - amount)
-    supabase.table("debts").delete().eq("player_id", player_id).execute()
-    if new_debt > 0:
-        supabase.table("debts").insert({"player_id": player_id, "amount": new_debt, "is_paid": False}).execute()
-    return {"success": True, "previous_debt": total_debt, "new_debt": new_debt}
+    txs = supabase.table("transactions").select("amount").eq("player_id", player_id).execute()
+    balance = sum(t["amount"] for t in txs.data)
+    new_balance = max(0, balance - amount)
+    if amount > 0:
+        supabase.table("transactions").insert({
+            "player_id": player_id,
+            "amount": -amount,
+            "description": "Pago",
+            "year": datetime.now().year,
+            "month": datetime.now().month,
+        }).execute()
+    return {"success": True, "previous_debt": balance, "new_debt": new_balance}
 
 
 def _format_player_grid(players: list[dict]) -> str:
