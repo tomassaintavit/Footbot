@@ -115,8 +115,8 @@ def sync_debts() -> dict:
     return {"success": True, "updated": updated, "skipped": skipped, "errors": errors, "message": msg}
 
 
-def _format_amount(value: float) -> str:
-    return f"${int(value)}" if value == int(value) else f"${value:.2f}"
+def _format_amount(value: float) -> int | float:
+    return int(value) if value == int(value) else round(value, 2)
 
 
 def add_monthly_fee(amount: float) -> dict:
