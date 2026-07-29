@@ -2,7 +2,7 @@ import logging
 from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from routers import attendance, players, chat, matches, public
+from routers import attendance, players, chat, matches, public, admin
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +32,7 @@ app.include_router(players.router)
 app.include_router(chat.router)
 app.include_router(matches.router)
 app.include_router(public.router)
+app.include_router(admin.router)
 
 @app.get("/")
 def root():
