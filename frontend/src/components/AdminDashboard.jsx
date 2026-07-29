@@ -78,7 +78,7 @@ export default function AdminDashboard({ adminPlayer, session, onLogout, onBack 
                 <h2 className="text-sm font-semibold text-white/70 mb-3">Deuda por Jugador</h2>
                 {summary.by_player.filter(p => p.total_debt > 0).length > 0 ? (
                   <ResponsiveContainer width="100%" height={Math.max(150, summary.by_player.filter(p => p.total_debt > 0).length * 25)}>
-                    <BarChart data={[...summary.by_player].filter(p => p.total_debt > 0).sort((a, b) => a.total_debt - b.total_debt)} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 10 }}>
+                    <BarChart data={[...summary.by_player].filter(p => p.total_debt > 0).sort((a, b) => b.total_debt - a.total_debt)} layout="vertical" margin={{ top: 0, right: 0, bottom: 0, left: 10 }}>
                       <XAxis type="number" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 10 }} axisLine={false} tickLine={false} />
                       <YAxis type="category" dataKey="last_name" tick={{ fill: 'rgba(255,255,255,0.6)', fontSize: 11 }} axisLine={false} tickLine={false} width={80} />
                       <Tooltip formatter={(v) => formatCurrency(v)} contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '8px', fontSize: '12px' }} />
